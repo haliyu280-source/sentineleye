@@ -224,12 +224,30 @@ if [ "$OUTPUT_FORMAT" = "json" ]; then
         health_status="warning"
     fi
 
+    # Per-check results for the dashboard (same "healthy"/"warning" vocabulary as status)
+    if [ "$disk_status" -eq 0 ]; then disk_check_status="healthy"; else disk_check_status="warning"; fi
+    if [ "$cpu_status" -eq 0 ]; then cpu_check_status="healthy"; else cpu_check_status="warning"; fi
+
+    # Thresholds as JSON numbers; null when not a valid 0-100 whole number
+    disk_threshold_json=null
+    if [[ "$disk_threshold" =~ ^[0-9]+$ ]] && [ "$disk_threshold" -le 100 ]; then
+        disk_threshold_json=$((10#$disk_threshold))
+    fi
+    cpu_threshold_json=null
+    if [[ "$cpu_threshold" =~ ^[0-9]+$ ]] && [ "$cpu_threshold" -le 100 ]; then
+        cpu_threshold_json=$((10#$cpu_threshold))
+    fi
+
     printf '{\n'
     printf '  "operating_system": "%s",\n' "$(uname -s)"
     printf '  "disk_usage": %s,\n' "$disk_usage"
     printf '  "cpu_usage": %s,\n' "$cpu_usage"
     printf '  "memory_total_mb": %s,\n' "$memory_total_mb"
-    printf '  "status": "%s"\n' "$health_status"
+    printf '  "status": "%s",\n' "$health_status"
+    printf '  "disk_status": "%s",\n' "$disk_check_status"
+    printf '  "disk_threshold": %s,\n' "$disk_threshold_json"
+    printf '  "cpu_status": "%s",\n' "$cpu_check_status"
+    printf '  "cpu_threshold": %s\n' "$cpu_threshold_json"
     printf '}\n'
 fi
 

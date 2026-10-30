@@ -2,20 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const REFRESH_SECONDS = 10
 
+class HealthError extends Error {
+  constructor(kind, message) {
+    super(message)
+    this.kind = kind
+  }
+}
+
 async function fetchHealth() {
   let response
   try {
     response = await fetch('/api/health', { cache: 'no-store' })
   } catch {
-    throw new Error('Cannot reach the SentinelEye backend')
+    throw new HealthError('unreachable', 'No response from the backend')
   }
 
   const body = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(body?.error ?? `Backend returned HTTP ${response.status}`)
+    // The backend's own errors carry JSON; a bare 5xx comes from the dev proxy when FastAPI is down
+    if (body?.error) throw new HealthError('failed', `${body.error} (HTTP ${response.status})`)
+    throw new HealthError('unreachable', `No response from the backend (HTTP ${response.status})`)
   }
   if (!body || typeof body.status !== 'string') {
-    throw new Error('Unexpected response from backend')
+    throw new HealthError('failed', 'The backend sent a response SentinelEye could not read')
   }
   return body
 }
@@ -43,11 +52,13 @@ export function useHealth() {
       setError(null)
       setCheckedAt(new Date())
     } catch (err) {
-      setError(err.message)
+      setError({ kind: err.kind ?? 'failed', message: err.message })
     } finally {
       inFlight.current = false
       setLoading(false)
-      setNextAt(Date.now() + REFRESH_SECONDS * 1000)
+      const finishedAt = Date.now()
+      setNow(finishedAt)
+      setNextAt(finishedAt + REFRESH_SECONDS * 1000)
       timer.current = setTimeout(() => refreshRef.current(), REFRESH_SECONDS * 1000)
     }
   }, [])

@@ -184,7 +184,15 @@
   color: var(--text);
   background: color-mix(in srgb, var(--tone) 10%, var(--bg));
   border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
-  border-left: 3px solid var(--tone);
+}
+
+.alert code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  white-space: nowrap;
 }
 
 .alert strong {
@@ -244,8 +252,34 @@
   from { opacity: 0; transform: translateY(8px); }
 }
 
+.panel-warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+.panel-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+
+/* Text equivalent of the amber gauge, so status never relies on colour alone */
+.panel-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
 .panel-label {
-  align-self: flex-start;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
@@ -278,12 +312,27 @@
 }
 
 .gauge-track {
-  stroke: var(--border);
+  stroke: var(--gauge-track);
 }
 
+/* Gauges stay neutral; only a panel whose own check fails turns amber */
 .gauge-fill {
-  stroke: var(--status);
+  stroke: var(--gauge-fill);
   transition: stroke-dasharray 300ms var(--ease-in-out), stroke 200ms ease;
+}
+
+.panel-warning .gauge-fill {
+  stroke: var(--warning);
+}
+
+.panel-limit {
+  white-space: nowrap;
+}
+
+.gauge-limit {
+  stroke: var(--text);
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
 
 .gauge-value {
@@ -414,7 +463,7 @@
     padding: 16px 18px;
   }
 
-  .panel-label {
+  .panel-head {
     width: 100%;
   }
 

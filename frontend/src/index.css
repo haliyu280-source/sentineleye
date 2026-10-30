@@ -6,7 +6,9 @@
   --border-strong: #2e3a48;
   --text: #e6ebf1;
   --text-muted: #8b98a8;
-  --text-faint: #5b6776;
+  --text-faint: #7d8a9a;
+  --gauge-fill: #b4bfcc;
+  --gauge-track: #3a4656;
   --accent: #5ec8e5;
   --healthy: #3ddc97;
   --warning: #f5b544;
@@ -51,4 +53,9 @@ p {
 button {
   font: inherit;
   color: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text);
 }
