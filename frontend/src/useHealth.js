@@ -2,6 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const REFRESH_SECONDS = 10
 
+// Readings kept in memory for the trend chart and check log (this browser session only)
+export const HISTORY_LIMIT = 30
+
+const toReading = (at, body, ms) => ({
+  at,
+  status: body.status,
+  disk: body.disk_usage,
+  cpu: body.cpu_usage,
+  diskStatus: body.disk_status,
+  cpuStatus: body.cpu_status,
+  ms,
+})
+
 class HealthError extends Error {
   constructor(kind, message) {
     super(message)
@@ -38,6 +51,7 @@ export function useHealth() {
   const [loading, setLoading] = useState(true)
   const [nextAt, setNextAt] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  const [history, setHistory] = useState([])
   const inFlight = useRef(false)
   const timer = useRef(null)
 
@@ -47,12 +61,20 @@ export function useHealth() {
     clearTimeout(timer.current)
     setLoading(true)
 
+    const startedAt = performance.now()
     try {
-      setData(await fetchHealth())
+      const body = await fetchHealth()
+      const at = new Date()
+      setData(body)
       setError(null)
-      setCheckedAt(new Date())
+      setCheckedAt(at)
+      setHistory((h) => [...h, toReading(at, body, performance.now() - startedAt)].slice(-HISTORY_LIMIT))
     } catch (err) {
       setError({ kind: err.kind ?? 'failed', message: err.message })
+      setHistory((h) =>
+        [...h, { at: new Date(), status: 'offline', ms: performance.now() - startedAt, message: err.message }]
+          .slice(-HISTORY_LIMIT),
+      )
     } finally {
       inFlight.current = false
       setLoading(false)
@@ -85,5 +107,5 @@ export function useHealth() {
 
   const secondsLeft = nextAt ? Math.max(0, Math.ceil((nextAt - now) / 1000)) : REFRESH_SECONDS
 
-  return { data, error, checkedAt, loading, secondsLeft, refresh }
+  return { data, error, checkedAt, loading, secondsLeft, refresh, history }
 }
