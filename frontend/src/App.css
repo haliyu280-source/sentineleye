@@ -1,0 +1,452 @@
+.app {
+  --status: var(--accent);
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 32px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.app.status-healthy { --status: var(--healthy); }
+.app.status-warning { --status: var(--warning); }
+.app.status-offline { --status: var(--offline); }
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.logo-pupil {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.brand h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--status);
+  background: color-mix(in srgb, var(--status) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status) 35%, transparent);
+  transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease;
+}
+
+.badge-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status);
+  transition: background-color 200ms ease;
+}
+
+/* "Live" ping: transform + opacity only, so it stays on the compositor */
+.badge-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--status);
+  animation: ping 2.4s var(--ease-out) infinite;
+}
+
+/* An offline backend isn't live, so the dot stops pinging */
+.badge-offline .badge-dot::after {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes ping {
+  0% { transform: scale(1); opacity: 0.6; }
+  70%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    transform 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .refresh:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--panel);
+  }
+}
+
+.refresh:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.refresh:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.refresh:disabled {
+  cursor: progress;
+}
+
+.refresh svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.spin {
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.countdown {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 6.5ch;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Alerts ---------- */
+
+.alert {
+  --tone: var(--offline);
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: color-mix(in srgb, var(--tone) 10%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
+  border-left: 3px solid var(--tone);
+}
+
+.alert strong {
+  color: var(--tone);
+  font-weight: 600;
+}
+
+.alert-warning {
+  --tone: var(--warning);
+}
+
+.alert {
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+@starting-style {
+  .alert {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------- Panels ---------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+.grid.stale {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 20px 20px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+/* First readings cascade in once, replacing the skeleton */
+.panel:not(.skeleton) {
+  animation: panel-in 280ms var(--ease-out) both;
+}
+
+.panel:nth-child(2) { animation-delay: 50ms; }
+.panel:nth-child(3) { animation-delay: 100ms; }
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.panel-label {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.panel-hint {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
+.gauge-wrap {
+  position: relative;
+  width: 168px;
+  height: 168px;
+}
+
+.gauge {
+  width: 100%;
+  height: 100%;
+  transform: rotate(135deg);
+}
+
+.gauge circle {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.gauge-track {
+  stroke: var(--border);
+}
+
+.gauge-fill {
+  stroke: var(--status);
+  transition: stroke-dasharray 300ms var(--ease-in-out), stroke 200ms ease;
+}
+
+.gauge-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: 64px;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A new reading settles in with a brief blur, so the change registers without a jump */
+.num-update {
+  animation: value-in 220ms var(--ease-out);
+}
+
+@keyframes value-in {
+  from { opacity: 0.4; filter: blur(2px); }
+}
+
+.unit {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-left: 3px;
+}
+
+.unavailable {
+  font-size: 0.95rem;
+  color: var(--text-faint);
+  align-self: center;
+}
+
+.memory {
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.memory .num {
+  font-size: 3rem;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 48px 0;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+/* ---------- Skeleton ---------- */
+
+.sk {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--border) 0%, var(--border-strong) 50%, var(--border) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.sk-label { align-self: flex-start; width: 56px; height: 12px; }
+.sk-gauge { width: 148px; height: 148px; margin: 10px 0; border-radius: 50%; }
+.sk-hint { width: 120px; height: 12px; }
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* ---------- Footer ---------- */
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.meta-key {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-right: 6px;
+}
+
+/* ---------- Reduced motion: keep fades, drop movement ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .panel:not(.skeleton) { animation-name: fade-in; }
+  .badge-dot::after,
+  .spin,
+  .sk { animation: none; }
+  .refresh:active:not(:disabled) { transform: none; }
+  .gauge-fill { transition: stroke 200ms ease; }
+  .alert { transition: opacity 200ms ease; }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 760px) {
+  .app {
+    padding: 20px 16px 32px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 16px 18px;
+  }
+
+  .panel-label {
+    width: 100%;
+  }
+
+  .gauge-wrap,
+  .memory {
+    width: 120px;
+    height: 120px;
+  }
+
+  .gauge-value {
+    padding-top: 44px;
+  }
+
+  .num {
+    font-size: 1.45rem;
+  }
+
+  .unit {
+    font-size: 0.85rem;
+  }
+
+  .memory .num {
+    font-size: 2.2rem;
+  }
+
+  .panel-hint {
+    flex: 1;
+    text-align: right;
+  }
+
+  .sk-gauge {
+    width: 110px;
+    height: 110px;
+  }
+}
