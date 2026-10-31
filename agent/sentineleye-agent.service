@@ -1,0 +1,36 @@
+[Unit]
+Description=SentinelEye monitoring agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentineleye
+Group=sentineleye
+EnvironmentFile=/etc/sentineleye-agent/agent.env
+Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WorkingDirectory=/opt/sentineleye-agent
+ExecStart=/usr/bin/python3 -m sentineleye_agent
+Restart=always
+RestartSec=10
+
+# The agent only reads /proc and statvfs and makes outbound HTTPS requests
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+MemoryMax=64M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target

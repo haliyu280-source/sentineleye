@@ -1,13 +1,21 @@
+# SentinelEye. Copyright (c) 2026 Ali Khaleel Hassan. All rights reserved. See LICENSE.
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import subprocess
 import json
 
+from sentineleye import __version__
+from sentineleye.web import lifespan, mount_dashboard, setup
+
 app = FastAPI(
     title="SentinelEye",
     description="SentinelEye: A sharper eye on your infrastructure. Monitors system health, detects resource usage issues and provides clear infrastructure visibility.",
-    version="1.0.0"
+    version=__version__,
+    contact={"name": "Ali K. Hassan"},
+    lifespan=lifespan,
 )
+setup(app)
 
 
 @app.get("/api/health")
@@ -39,3 +47,7 @@ def get_health():
             status_code=500,
             content={"error": "Invalid JSON returned by SentinelEye"}
         )
+
+
+# Registered last so the dashboard's catch-all route never shadows an API route
+mount_dashboard(app)

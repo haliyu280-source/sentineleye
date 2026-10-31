@@ -1,0 +1,26 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+data
+*.db
+*.db-*
+.DS_Store
+
+frontend/node_modules
+frontend/dist
+
+# Not part of the central image
+agent
+tests
+docs
+*.md
+*.png
+health-check
+health-check.shx
+health-checker.sh

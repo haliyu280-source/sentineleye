@@ -1,4 +1,5 @@
 #!/bin/bash
+# SentinelEye. Copyright (c) 2026 Ali Khaleel Hassan. All rights reserved. See LICENSE.
 
 # Output format: text or json
 OUTPUT_FORMAT=${OUTPUT_FORMAT:-text}

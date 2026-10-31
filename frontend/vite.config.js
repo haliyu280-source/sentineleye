@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     // Forward API calls to the FastAPI backend so the browser sees one origin (no CORS needed)
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
+      '/api': process.env.SENTINELEYE_API_URL || 'http://127.0.0.1:8000',
     },
   },
 })

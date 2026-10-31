@@ -1,0 +1,31 @@
+services:
+  sentineleye:
+    build: .
+    image: sentineleye:1.0.0
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      SENTINELEYE_ADMIN_TOKEN: ${SENTINELEYE_ADMIN_TOKEN:?Set SENTINELEYE_ADMIN_TOKEN in .env}
+      SENTINELEYE_DATABASE_URL: sqlite:////data/sentineleye.db
+    ports:
+      # Bind to localhost by default; put a TLS reverse proxy in front for remote agents
+      - "${SENTINELEYE_BIND:-127.0.0.1}:${SENTINELEYE_PORT:-8000}:8000"
+    volumes:
+      - sentineleye-data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  sentineleye-data:

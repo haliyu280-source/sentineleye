@@ -1,16 +1,30 @@
-# React + Vite
+# SentinelEye dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite single-page app for SentinelEye. In production it is built into `dist/` and served by
+the FastAPI backend from the same origin.
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev      # http://localhost:5173, proxies /api to http://127.0.0.1:8000
+npm run lint
+npm run build
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Point the dev proxy at another backend with `SENTINELEYE_API_URL=http://host:port npm run dev`.
 
-## React Compiler
+## Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src/
+  App.jsx              shell: top bar, navigation, admin gate, footer
+  pages/
+    Fleet.jsx          overview, server list, registration
+    ServerDetail.jsx   one server: usage, history, agent, alerts, settings, tokens
+    Alerts.jsx         incidents and alert history
+    LocalHost.jsx      the original single-machine view (GET /api/health)
+  components/          shared UI: meters, status chips, charts, alert table, sign-in
+  lib/                 API client, hash router, polling, formatting
+```
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Routes are hash-based (`#/`, `#/servers/3`, `#/alerts`, `#/local`) so the build stays a set of
+static files.
