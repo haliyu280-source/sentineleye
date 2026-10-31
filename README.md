@@ -15,6 +15,7 @@ server stops reporting, and shows everything on a web dashboard.
 | **How** | Python agent → HTTPS → FastAPI backend → SQLite → React dashboard |
 | **Alerting** | Threshold and availability incidents with grace period, deduplication and automatic recovery |
 | **Tested** | 92 automated tests, plus live runs on Ubuntu 24.04 with real load and real agent outages |
+| **Live demo** | [sentineleye-nine.vercel.app](https://sentineleye-nine.vercel.app): read-only, real data from Ubuntu agents. The backend runs on the author's own machine behind a Cloudflare tunnel, so it is not online all the time; when it is down the dashboard says so instead of showing data. |
 
 ---
 

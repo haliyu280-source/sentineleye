@@ -31,6 +31,19 @@ current_url() {
 
 running() { pgrep -f "$PATTERN" >/dev/null; }
 
+# Check a tunnel URL from the outside. A brand-new trycloudflare.com name can be cached locally as
+# "not found" if it was looked up too early, so resolve it through public DNS when dig is available.
+answers() {
+    local url=$1 host ip
+    host=${url#https://}
+    ip=$(command -v dig >/dev/null && dig +short @1.1.1.1 "$host" | grep -m1 -E '^[0-9.]+$' || true)
+    if [ -n "$ip" ]; then
+        curl -fsS -o /dev/null --max-time 10 --resolve "$host:443:$ip" "$url/healthz" 2>/dev/null
+    else
+        curl -fsS -o /dev/null --max-time 10 "$url/healthz" 2>/dev/null
+    fi
+}
+
 start() {
     command -v cloudflared >/dev/null || die "cloudflared is not installed"
     curl -fsS -o /dev/null "$BACKEND/healthz" || die "backend is not answering at $BACKEND/healthz"
@@ -40,24 +53,26 @@ start() {
         mkdir -p "$(dirname "$LOG")"
         : > "$LOG"
         nohup cloudflared tunnel --no-autoupdate --url "$BACKEND" >> "$LOG" 2>&1 &
+        # Wait for the URL and a registered connection before anyone looks the name up
         for _ in $(seq 1 60); do
-            current_url >/dev/null && break
+            current_url >/dev/null && grep -q "Registered tunnel connection" "$LOG" && break
             sleep 1
         done
+        sleep 5
     fi
     url=$(current_url) || die "no tunnel URL yet; see $LOG"
     for _ in $(seq 1 30); do
-        curl -fsS -o /dev/null "$url/healthz" && break
+        answers "$url" && break
         sleep 2
     done
-    curl -fsS -o /dev/null "$url/healthz" || die "tunnel started but $url/healthz is not answering yet; see $LOG"
+    answers "$url" || die "tunnel started but $url/healthz is not answering yet; see $LOG"
     echo "$url"
 }
 
 publish() {
     command -v vercel >/dev/null || die "the Vercel CLI is not installed"
     url=$(current_url) || die "no tunnel URL; run: $0 start"
-    curl -fsS -o /dev/null "$url/healthz" || die "$url is not answering; run: $0 start"
+    answers "$url" || die "$url is not answering; run: $0 start"
     cd "$ROOT/frontend"
     [ -f .vercel/project.json ] || die "frontend/ is not linked to a Vercel project (run: vercel link)"
     vercel env rm VITE_SENTINELEYE_API_URL production --yes >/dev/null 2>&1 || true
