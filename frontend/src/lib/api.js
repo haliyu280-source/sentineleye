@@ -1,6 +1,13 @@
 // Client for the SentinelEye management API. The admin token lives in sessionStorage for
 // this tab only and is sent as a Bearer token; it is cleared as soon as the API rejects it.
 
+// Where the backend lives. Empty (the default) means the same origin: the Vite dev proxy locally,
+// or FastAPI serving the dashboard itself. A separately hosted dashboard sets
+// VITE_SENTINELEYE_API_URL at build time. It is a public address, never a secret.
+export const API_BASE = (import.meta.env.VITE_SENTINELEYE_API_URL || '').replace(/\/+$/, '')
+export const HOSTED = API_BASE !== ''
+export const apiUrl = (path) => `${API_BASE}${path}`
+
 const TOKEN_KEY = 'sentineleye.adminToken'
 const listeners = new Set()
 
@@ -45,7 +52,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   const token = getToken()
   let response
   try {
-    response = await fetch(path, {
+    response = await fetch(apiUrl(path), {
       method,
       cache: 'no-store',
       headers: {

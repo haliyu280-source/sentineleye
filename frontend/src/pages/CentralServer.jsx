@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useHealth, REFRESH_SECONDS, HISTORY_LIMIT } from '../lib/useHealth'
 import { formatMs, formatPercent, formatTime } from '../lib/format'
-import { Meter, RefreshButton, StatusChip, StatusDot, TopbarControls } from '../components/ui'
+import { Meter, OfflineHint, RefreshButton, StatusChip, StatusDot, TopbarControls } from '../components/ui'
 
 const STATUS_LABELS = {
   healthy: 'Healthy',
@@ -281,8 +281,7 @@ function ErrorAlert({ error, hasData }) {
   if (error.kind === 'unreachable') {
     return (
       <div className="alert" role="alert">
-        <strong>Can't reach the SentinelEye backend.</strong> {error.message}. Start it from the
-        project folder with <code>.venv/bin/python -m uvicorn main:app --reload</code>. {fallback}
+        <strong>Can't reach the SentinelEye backend.</strong> {error.message}. <OfflineHint /> {fallback}
       </div>
     )
   }

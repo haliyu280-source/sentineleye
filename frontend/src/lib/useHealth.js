@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { apiUrl } from './api'
 
 export const REFRESH_SECONDS = 10
 
@@ -25,7 +26,7 @@ class HealthError extends Error {
 async function fetchHealth() {
   let response
   try {
-    response = await fetch('/api/health', { cache: 'no-store' })
+    response = await fetch(apiUrl('/api/health'), { cache: 'no-store' })
   } catch {
     throw new HealthError('unreachable', 'No response from the backend')
   }

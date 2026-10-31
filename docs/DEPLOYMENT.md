@@ -180,6 +180,63 @@ must point at the host, and ports 80 and 443 must be open. Keep the `sentineleye
 client addresses (used for rate limiting) are taken from `X-Forwarded-For`. With nginx, use
 `proxy_pass http://127.0.0.1:8000;` and set `X-Forwarded-For` and `X-Forwarded-Proto`.
 
+## Public demo: Vercel dashboard and a Cloudflare Quick Tunnel
+
+A zero-cost way to show a running instance without renting a server: the backend keeps running in
+Docker on the author's own machine, Cloudflare publishes it over HTTPS without opening any inbound
+port, and Vercel hosts the dashboard.
+
+```
+Browser ──► Vercel (static dashboard) ──► https://<random>.trycloudflare.com ──► cloudflared ──► 127.0.0.1:8000 (Docker)
+                                                                                                     ▲
+                                                                       agents on the same machine ───┘
+```
+
+1. Run the backend with Docker Compose as above, with `SENTINELEYE_PUBLIC_DASHBOARD=true` and
+   `FORWARDED_ALLOW_IPS=*` in `.env`. The port stays bound to `127.0.0.1`, so only local processes,
+   including `cloudflared`, can reach it, which is what makes trusting forwarded headers safe.
+2. Start the tunnel and note its URL:
+
+   ```bash
+   deploy/demo-tunnel.sh start
+   ```
+
+3. Allow the dashboard's Vercel address in `.env` and reload the backend:
+
+   ```bash
+   # .env
+   SENTINELEYE_CORS_ORIGINS=https://<project>.vercel.app
+   ```
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Build and deploy the dashboard against the tunnel (needs the Vercel CLI, logged in, with
+   `frontend/` linked to the project):
+
+   ```bash
+   deploy/demo-tunnel.sh publish
+   ```
+
+   The dashboard reads the backend address from `VITE_SENTINELEYE_API_URL` at build time. It is a
+   public address, never a secret; the admin token is never part of the frontend.
+
+Limits of this setup:
+
+- **The URL is temporary.** A Quick Tunnel gets a new random `trycloudflare.com` address every time
+  it starts, with no uptime guarantee and a limit of 200 requests in flight; Cloudflare offers it for
+  testing. After each restart, run `deploy/demo-tunnel.sh start` and then `publish`. A permanent
+  address needs a named tunnel and a domain on Cloudflare.
+- **It is only online while the machine is.** When the machine sleeps or shuts down, the dashboard
+  shows "Can't reach the SentinelEye backend" and no data; when the machine is back, the agents
+  report again and their incidents recover.
+- **Restarts are manual.** Docker restarts the backend, but the tunnel does not start by itself after
+  a reboot.
+
+Find the current URL with `deploy/demo-tunnel.sh url` and stop the tunnel with
+`deploy/demo-tunnel.sh stop`. The tunnel's log is `~/Library/Logs/sentineleye-tunnel.log` on macOS.
+
 ## Render
 
 `render.yaml` is a Render Blueprint for one free Docker web service and one free Render Postgres

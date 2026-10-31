@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { AdminGate, SignInForm } from './components/AdminGate'
 import { AccessContext } from './lib/access'
-import { getToken, onTokenChange } from './lib/api'
+import { apiUrl, getToken, onTokenChange } from './lib/api'
 import { useRoute } from './lib/router'
 import { TopbarSlot } from './lib/topbar'
 import Alerts from './pages/Alerts'
@@ -22,24 +22,41 @@ function FleetPages({ route }) {
   return <Fleet />
 }
 
+const META_RETRY_SECONDS = 15
+
+// null while loading, the /api/meta response when the backend answers, 'offline' when it doesn't.
+// While offline it keeps asking, so the dashboard recovers by itself when the backend returns.
 function useAccessState() {
-  const [publicMode, setPublicMode] = useState(null)
+  const [meta, setMeta] = useState(null)
   const [token, setCurrentToken] = useState(getToken)
 
   useEffect(() => onTokenChange(setCurrentToken), [])
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/meta', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((meta) => !cancelled && setPublicMode(Boolean(meta?.public_dashboard)))
-      .catch(() => !cancelled && setPublicMode(false))
+    let timer
+    const load = () =>
+      fetch(apiUrl('/api/meta'), { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then((body) => !cancelled && setMeta(body))
+        .catch(() => {
+          if (cancelled) return
+          setMeta('offline')
+          timer = setTimeout(load, META_RETRY_SECONDS * 1000)
+        })
+    load()
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
   }, [])
 
-  return { ready: publicMode !== null, publicMode: Boolean(publicMode), isAdmin: Boolean(token) }
+  return {
+    ready: meta !== null,
+    offline: meta === 'offline',
+    publicMode: Boolean(meta?.public_dashboard),
+    isAdmin: Boolean(token),
+  }
 }
 
 export default function App() {

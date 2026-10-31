@@ -1,5 +1,6 @@
 import { useContext, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { HOSTED } from '../lib/api'
 import { STATUS_LABELS } from '../lib/format'
 import { TopbarSlot } from '../lib/topbar'
 
@@ -89,17 +90,31 @@ export function CopyField({ value, label }) {
   )
 }
 
+// Shown whenever the backend cannot be reached. The hosted dashboard says so plainly instead of
+// showing old or invented numbers; locally it tells the developer how to start the backend.
+export function OfflineHint() {
+  if (HOSTED) {
+    return (
+      <>
+        The backend runs on the author's own machine and is not online all the time. Live data
+        appears again as soon as it is reachable.
+      </>
+    )
+  }
+  return (
+    <>
+      Start it from the project folder with <code>.venv/bin/python -m uvicorn main:app --reload</code>.
+    </>
+  )
+}
+
 export function ErrorNote({ error, onRetry }) {
   if (!error) return null
   const unreachable = error.status === 0
   return (
     <div className="alert" role="alert">
       <strong>{unreachable ? "Can't reach the SentinelEye backend." : 'Request failed.'}</strong> {error.message}.
-      {unreachable && (
-        <>
-          {' '}Start it from the project folder with <code>.venv/bin/python -m uvicorn main:app --reload</code>.
-        </>
-      )}
+      {unreachable && <> <OfflineHint /></>}
       {onRetry && (
         <>
           {' '}

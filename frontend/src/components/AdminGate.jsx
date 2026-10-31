@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAccess } from '../lib/access'
 import { api, ApiError, setToken } from '../lib/api'
+import { OfflineHint } from './ui'
 
 export function SignInForm({ onDone }) {
   const { publicMode } = useAccess()
@@ -76,12 +77,29 @@ export function SignInForm({ onDone }) {
   )
 }
 
-// Fleet pages: open to everyone in public mode, otherwise only after signing in
+// Fleet pages: open to everyone in public mode, otherwise only after signing in.
+// An unreachable backend is reported as offline rather than as a sign-in prompt.
 export function AdminGate({ children }) {
-  const { ready, publicMode, isAdmin } = useAccess()
+  const { ready, offline, publicMode, isAdmin } = useAccess()
   if (!ready) return <main className="page" />
+  if (offline) return <BackendOffline />
   if (publicMode || isAdmin) return children
   return <SignInForm />
+}
+
+function BackendOffline() {
+  return (
+    <main className="page">
+      <div className="page-head">
+        <h1>Infrastructure</h1>
+        <p className="page-sub">No live data is shown while the backend is unreachable.</p>
+      </div>
+      <div className="alert" role="alert">
+        <strong>Can't reach the SentinelEye backend.</strong> <OfflineHint /> This page checks again every
+        15 seconds.
+      </div>
+    </main>
+  )
 }
 
 export function AccessButton() {
