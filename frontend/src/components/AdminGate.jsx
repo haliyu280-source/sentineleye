@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react'
-import { api, ApiError, getToken, onTokenChange, setToken } from '../lib/api'
+import { useState } from 'react'
+import { useAccess } from '../lib/access'
+import { api, ApiError, setToken } from '../lib/api'
 
-// Fleet pages need the backend's admin token. It is checked against the API before being kept.
-export function AdminGate({ children }) {
-  const [token, setCurrent] = useState(getToken)
+export function SignInForm({ onDone }) {
+  const { publicMode } = useAccess()
   const [value, setValue] = useState('')
   const [error, setError] = useState(null)
   const [checking, setChecking] = useState(false)
-
-  useEffect(() => onTokenChange(setCurrent), [])
-
-  if (token) return children
 
   const submit = async (event) => {
     event.preventDefault()
@@ -19,8 +15,12 @@ export function AdminGate({ children }) {
     setError(null)
     setToken(value.trim())
     try {
-      await api('/api/overview')
+      // A management-only endpoint, so public read access can't make a wrong token look valid
+      await api('/api/servers/0/tokens').catch((err) => {
+        if (!(err instanceof ApiError && err.status === 404)) throw err
+      })
       setValue('')
+      onDone?.()
     } catch (err) {
       setToken(null)
       if (err instanceof ApiError && err.status === 503) {
@@ -38,8 +38,9 @@ export function AdminGate({ children }) {
   return (
     <main className="page">
       <div className="page-head">
-        <h1>Fleet access</h1>
+        <h1>{publicMode ? 'Admin sign in' : 'Fleet access'}</h1>
         <p className="page-sub">
+          {publicMode ? 'Signing in adds server registration, settings, tokens and alert actions. ' : ''}
           Enter the admin token configured on the backend as <code className="inline-code">SENTINELEYE_ADMIN_TOKEN</code>.
           It is kept in this browser tab only.
         </p>
@@ -66,8 +67,8 @@ export function AdminGate({ children }) {
           <button type="submit" className="btn btn-primary" disabled={checking || !value.trim()}>
             {checking ? 'Checking…' : 'Continue'}
           </button>
-          <a className="link-button" href="#/local">
-            View this host without signing in
+          <a className="link-button" href={publicMode ? '#/' : '#/central'}>
+            {publicMode ? 'Back to the dashboard' : 'View the central server without signing in'}
           </a>
         </div>
       </form>
@@ -75,10 +76,28 @@ export function AdminGate({ children }) {
   )
 }
 
-export function SignOutButton() {
+// Fleet pages: open to everyone in public mode, otherwise only after signing in
+export function AdminGate({ children }) {
+  const { ready, publicMode, isAdmin } = useAccess()
+  if (!ready) return <main className="page" />
+  if (publicMode || isAdmin) return children
+  return <SignInForm />
+}
+
+export function AccessButton() {
+  const { publicMode, isAdmin } = useAccess()
+  if (isAdmin) {
+    return (
+      <button type="button" className="btn btn-quiet" onClick={() => setToken(null)}>
+        Sign out
+      </button>
+    )
+  }
+  if (!publicMode) return null
   return (
-    <button type="button" className="btn btn-quiet" onClick={() => setToken(null)}>
-      Sign out
-    </button>
+    <span className="access-note">
+      Read-only view
+      <a className="btn btn-quiet" href="#/signin">Admin sign in</a>
+    </span>
   )
 }

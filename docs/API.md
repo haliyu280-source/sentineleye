@@ -16,9 +16,17 @@ Timestamps are ISO 8601 in UTC (`2026-10-31T00:21:25.223395Z`). Errors are JSON:
 
 | Caller | Header | Used for |
 |---|---|---|
-| Operator / dashboard | `Authorization: Bearer <SENTINELEYE_ADMIN_TOKEN>` | everything under `/api` except the two below |
+| Operator / dashboard | `Authorization: Bearer <SENTINELEYE_ADMIN_TOKEN>` | everything under `/api` except the agent and public endpoints |
 | Agent | `Authorization: Bearer se_<token_id>_<secret>` | `POST /api/agent/metrics` |
-| none | | `GET /api/health`, `GET /healthz`, `/docs` |
+| none | | `GET /api/health`, `GET /api/meta`, `GET /healthz`, `/docs` |
+| none, in public mode | | every `GET` marked *viewer* below |
+
+With `SENTINELEYE_PUBLIC_DASHBOARD=true`, *viewer* endpoints answer without a token. Requests that
+change anything, and everything about tokens, still require the admin token. Anonymous responses
+leave out `last_agent_error`. A token that is sent but wrong is always rejected.
+
+`GET /api/meta` returns `{"version": "1.0.0", "public_dashboard": true}` so the dashboard knows
+whether to ask for a token.
 
 Admin endpoints return `503` when no admin token is configured, `401` for a missing or wrong
 token, and `429` after 10 failed attempts per minute from one address.
@@ -64,13 +72,13 @@ curl -s -X DELETE $API/api/servers/1 -H "$ADMIN"          # delete with all hist
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/api/servers` | `201` with `server` and `agent_token`; `409` if the name exists |
-| `GET` | `/api/servers` | `?include_disabled=false` to hide disabled servers |
-| `GET` | `/api/servers/{id}` | status, reported system info, effective limits, latest sample, active alert count |
-| `PATCH` | `/api/servers/{id}` | `name`, `description`, `environment`, `enabled`, `thresholds` |
-| `DELETE` | `/api/servers/{id}` | removes tokens, metrics and alerts |
+| `POST` | `/api/servers` | admin. `201` with `server` and `agent_token`; `409` if the name exists |
+| `GET` | `/api/servers` | viewer. `?include_disabled=false` to hide disabled servers |
+| `GET` | `/api/servers/{id}` | viewer. Status, reported system info, effective limits, latest sample, active alert count |
+| `PATCH` | `/api/servers/{id}` | admin. `name`, `description`, `environment`, `enabled`, `thresholds` |
+| `DELETE` | `/api/servers/{id}` | admin. Removes tokens, metrics and alerts |
 
-### Tokens
+### Tokens (admin only)
 
 | Method | Path | Notes |
 |---|---|---|
@@ -79,7 +87,7 @@ curl -s -X DELETE $API/api/servers/1 -H "$ADMIN"          # delete with all hist
 | `POST` | `/api/servers/{id}/tokens/reissue` | revoke all active tokens and issue one replacement |
 | `POST` | `/api/servers/{id}/tokens/{token_id}/revoke` | revoke one token |
 
-## Monitoring
+## Monitoring (viewer)
 
 | Method | Path | Notes |
 |---|---|---|
@@ -108,11 +116,11 @@ curl -s "$API/api/alert-events?limit=20" -H "$ADMIN"                   # history
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/api/alerts` | filters: `status` (`open`, `acknowledged`, `resolved`, `active`, `all`), `server_id`, `kind`, `limit` |
-| `GET` | `/api/alerts/{id}` | alert plus `events` |
-| `POST` | `/api/alerts/{id}/acknowledge` | only from `open`; otherwise `409` |
-| `POST` | `/api/alerts/{id}/resolve` | from `open` or `acknowledged`; `409` if already resolved |
-| `GET` | `/api/alert-events` | newest first; `server_id`, `limit` |
+| `GET` | `/api/alerts` | viewer. Filters: `status` (`open`, `acknowledged`, `resolved`, `active`, `all`), `server_id`, `kind`, `limit` |
+| `GET` | `/api/alerts/{id}` | viewer. Alert plus `events` |
+| `POST` | `/api/alerts/{id}/acknowledge` | admin. Only from `open`; otherwise `409` |
+| `POST` | `/api/alerts/{id}/resolve` | admin. From `open` or `acknowledged`; `409` if already resolved |
+| `GET` | `/api/alert-events` | viewer. Newest first; `server_id`, `limit` |
 
 Kinds: `cpu_high`, `memory_high`, `disk_high`, `server_offline`.
 

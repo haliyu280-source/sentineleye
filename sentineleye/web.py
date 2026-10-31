@@ -106,6 +106,12 @@ def setup(app: FastAPI) -> None:
     for module in (servers, agent, overview, alerts):
         app.include_router(module.router)
 
+    @app.get("/api/meta", tags=["service"])
+    def meta():
+        """What the dashboard needs before signing in: version and whether viewing is public."""
+        current = get_settings()
+        return {"version": app.version, "public_dashboard": current.public_dashboard}
+
     @app.get("/healthz", tags=["service"], include_in_schema=False)
     def healthz():
         """Liveness/readiness probe for Docker: the process is up and the database answers."""

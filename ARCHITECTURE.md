@@ -54,7 +54,9 @@ which the backend records on the server.
 
 The dashboard is a static bundle. In development Vite proxies `/api` to the backend; in Docker
 FastAPI serves the bundle itself, so the browser talks to a single origin and no CORS is needed.
-Fleet pages send the admin token as a Bearer header and poll every 15 seconds.
+Fleet pages send the admin token as a Bearer header and poll every 15 seconds. The dashboard
+first asks `GET /api/meta` whether public read-only mode is on; if it is, visitors see the data
+straight away and management controls appear only after *Admin sign in*.
 
 ## Data model
 

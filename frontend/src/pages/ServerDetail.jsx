@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { AlertTable } from '../components/AlertTable'
 import { LineChart } from '../components/LineChart'
 import { CopyField, ErrorNote, Meter, RefreshButton, Segmented, StatusChip, StatusDot, TopbarControls } from '../components/ui'
+import { AccessButton } from '../components/AdminGate'
+import { useAccess } from '../lib/access'
 import { api } from '../lib/api'
 import { formatBytes, formatDateTime, formatDuration, formatPercent, STATUS_LABELS, timeAgo } from '../lib/format'
 import { usePolling } from '../lib/usePolling'
@@ -322,6 +324,7 @@ function ManageCard({ server, onChanged }) {
 }
 
 export default function ServerDetail({ id }) {
+  const { isAdmin } = useAccess()
   const { data, error, loading, refresh } = usePolling(async () => {
     const [server, alerts] = await Promise.all([
       api(`/api/servers/${id}`),
@@ -341,14 +344,17 @@ export default function ServerDetail({ id }) {
       </TopbarControls>
 
       <main className="page">
-        <div className="page-head">
-          <a className="back-link" href="#/">← Infrastructure</a>
-          <h1>{server?.name ?? 'Server'}</h1>
-          {server && (
-            <p className="page-sub">
-              {[server.hostname, server.environment, server.description].filter(Boolean).join(' · ') || 'Waiting for the agent'}
-            </p>
-          )}
+        <div className="page-head page-head-split">
+          <div>
+            <a className="back-link" href="#/">← Infrastructure</a>
+            <h1>{server?.name ?? 'Server'}</h1>
+            {server && (
+              <p className="page-sub">
+                {[server.hostname, server.environment, server.description].filter(Boolean).join(' · ') || 'Waiting for the agent'}
+              </p>
+            )}
+          </div>
+          <AccessButton />
         </div>
 
         <ErrorNote error={error} onRetry={refresh} />
@@ -389,7 +395,7 @@ export default function ServerDetail({ id }) {
               <AlertTable alerts={data.alerts} onChanged={refresh} showServer={false} />
             </section>
 
-            <ManageCard server={server} onChanged={refresh} />
+            {isAdmin && <ManageCard server={server} onChanged={refresh} />}
           </>
         )}
       </main>

@@ -1309,3 +1309,18 @@
 }
 
 .timeline-time { white-space: nowrap; }
+
+/* ---------- Public read-only view ---------- */
+
+.access-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.access-note .btn {
+  text-decoration: none;
+}

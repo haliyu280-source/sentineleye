@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ActivityList, AlertTable } from '../components/AlertTable'
 import { ErrorNote, RefreshButton, Segmented, StatusChip, TopbarControls } from '../components/ui'
+import { AccessButton } from '../components/AdminGate'
 import { api } from '../lib/api'
 import { usePolling } from '../lib/usePolling'
 
@@ -36,11 +37,14 @@ export default function Alerts() {
       </TopbarControls>
 
       <main className="page">
-        <div className="page-head">
-          <h1>Alerts</h1>
-          <p className="page-sub">
-            One incident per server and condition. Recoveries close incidents automatically.
-          </p>
+        <div className="page-head page-head-split">
+          <div>
+            <h1>Alerts</h1>
+            <p className="page-sub">
+              One incident per server and condition. Recoveries close incidents automatically.
+            </p>
+          </div>
+          <AccessButton />
         </div>
 
         <ErrorNote error={error} onRetry={refresh} />

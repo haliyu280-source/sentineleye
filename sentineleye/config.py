@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Bearer token for the management API. Left unset, management endpoints refuse every request.
     admin_token: str | None = None
 
+    # Let anyone view servers, history and alerts without signing in (e.g. a public showcase).
+    # Changes (registering, tokens, settings, acknowledging, deleting) always need the admin token.
+    public_dashboard: bool = False
+
     # Availability
     heartbeat_timeout_seconds: int = Field(90, ge=10)
     background_interval_seconds: int = Field(15, ge=1)

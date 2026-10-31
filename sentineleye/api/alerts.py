@@ -8,12 +8,12 @@ from ..db import get_db
 from ..models import ALERT_KINDS, Alert, AlertEvent
 from ..notify import flush_pending
 from ..schemas import ActivityOut, AlertActionIn, AlertDetail, AlertEventOut, AlertOut
-from ..security import require_admin
+from ..security import require_admin, viewer_access
 from ..services.alerts import acknowledge_alert, manually_resolve
 from ..timeutil import utcnow
 from .serializers import alert_fields, alert_out
 
-router = APIRouter(prefix="/api", tags=["alerts"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api", tags=["alerts"])
 
 StatusFilter = Literal["open", "acknowledged", "resolved", "active", "all"]
 
@@ -32,7 +32,7 @@ def _detail(alert: Alert) -> AlertDetail:
     )
 
 
-@router.get("/alerts", response_model=list[AlertOut])
+@router.get("/alerts", dependencies=[Depends(viewer_access)], response_model=list[AlertOut])
 def list_alerts(
     status_filter: StatusFilter = Query("all", alias="status", description="'active' means open or acknowledged"),
     server_id: int | None = None,
@@ -54,12 +54,12 @@ def list_alerts(
     return [alert_out(a) for a in db.scalars(query).all()]
 
 
-@router.get("/alerts/{alert_id}", response_model=AlertDetail)
+@router.get("/alerts/{alert_id}", dependencies=[Depends(viewer_access)], response_model=AlertDetail)
 def get_alert(alert_id: int, db: Session = Depends(get_db)):
     return _detail(_get_alert(db, alert_id))
 
 
-@router.post("/alerts/{alert_id}/acknowledge", response_model=AlertDetail)
+@router.post("/alerts/{alert_id}/acknowledge", dependencies=[Depends(require_admin)], response_model=AlertDetail)
 def acknowledge(alert_id: int, body: AlertActionIn | None = None, db: Session = Depends(get_db)):
     alert = _get_alert(db, alert_id)
     try:
@@ -70,7 +70,7 @@ def acknowledge(alert_id: int, body: AlertActionIn | None = None, db: Session = 
     return _detail(alert)
 
 
-@router.post("/alerts/{alert_id}/resolve", response_model=AlertDetail)
+@router.post("/alerts/{alert_id}/resolve", dependencies=[Depends(require_admin)], response_model=AlertDetail)
 def resolve(alert_id: int, body: AlertActionIn | None = None, db: Session = Depends(get_db)):
     alert = _get_alert(db, alert_id)
     try:
@@ -82,7 +82,7 @@ def resolve(alert_id: int, body: AlertActionIn | None = None, db: Session = Depe
     return _detail(alert)
 
 
-@router.get("/alert-events", response_model=list[ActivityOut])
+@router.get("/alert-events", dependencies=[Depends(viewer_access)], response_model=list[ActivityOut])
 def recent_activity(
     server_id: int | None = None,
     limit: int = Query(50, ge=1, le=500),

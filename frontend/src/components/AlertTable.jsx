@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
+import { useAccess } from '../lib/access'
 import { api } from '../lib/api'
 import { formatDateTime, formatPercent, KIND_LABELS, timeAgo } from '../lib/format'
 import { StatusText } from './ui'
@@ -35,6 +36,7 @@ function Timeline({ alertId }) {
 }
 
 export function AlertTable({ alerts, onChanged, showServer = true }) {
+  const { isAdmin } = useAccess()
   const [busy, setBusy] = useState(null)
   const [expanded, setExpanded] = useState(null)
   const [error, setError] = useState(null)
@@ -71,9 +73,11 @@ export function AlertTable({ alerts, onChanged, showServer = true }) {
               <th scope="col" className="num-col">Value / limit</th>
               <th scope="col">Opened</th>
               <th scope="col">Last seen</th>
-              <th scope="col" className="num-col">
-                <span className="visually-hidden">Actions</span>
-              </th>
+              {isAdmin && (
+                <th scope="col" className="num-col">
+                  <span className="visually-hidden">Actions</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -108,12 +112,13 @@ export function AlertTable({ alerts, onChanged, showServer = true }) {
                   </td>
                   <td className="mono">{formatDateTime(a.opened_at)}</td>
                   <td className="mono">{a.status === 'resolved' ? formatDateTime(a.resolved_at) : timeAgo(a.last_observed_at)}</td>
-                  <td className="num-col">
-                    <span className="row-actions">
-                      {a.status === 'open' && (
-                        <button type="button" className="btn btn-quiet" disabled={busy === a.id} onClick={() => act(a, 'acknowledge')}>
-                          Acknowledge
-                        </button>
+                  {isAdmin && (
+                    <td className="num-col">
+                      <span className="row-actions">
+                        {a.status === 'open' && (
+                          <button type="button" className="btn btn-quiet" disabled={busy === a.id} onClick={() => act(a, 'acknowledge')}>
+                            Acknowledge
+                          </button>
                       )}
                       {a.status !== 'resolved' && (
                         <button type="button" className="btn btn-quiet" disabled={busy === a.id} onClick={() => act(a, 'resolve')}>
@@ -122,10 +127,11 @@ export function AlertTable({ alerts, onChanged, showServer = true }) {
                       )}
                     </span>
                   </td>
+                  )}
                 </tr>
                 {expanded === a.id && (
                   <tr className="row-detail">
-                    <td colSpan={showServer ? 7 : 6}>
+                    <td colSpan={(showServer ? 6 : 5) + (isAdmin ? 1 : 0)}>
                       <p className="row-detail-message">{a.message}</p>
                       <Timeline alertId={a.id} />
                     </td>

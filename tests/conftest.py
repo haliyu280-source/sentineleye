@@ -12,6 +12,8 @@ os.environ.update(
         "SENTINELEYE_DATABASE_URL": f"sqlite:///{_db_dir}/test.db",
         "SENTINELEYE_ADMIN_TOKEN": "test-admin-token",
         "SENTINELEYE_RUN_BACKGROUND_JOBS": "false",
+        # Explicit values win over a developer's local .env
+        "SENTINELEYE_PUBLIC_DASHBOARD": "false",
         "SENTINELEYE_ALERT_CONSECUTIVE_BREACHES": "2",
         "SENTINELEYE_HEARTBEAT_TIMEOUT_SECONDS": "90",
         "SENTINELEYE_SMTP_HOST": "",

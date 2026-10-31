@@ -126,6 +126,21 @@ def require_admin(
     raise _unauthorized("Missing or invalid admin token")
 
 
+def viewer_access(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> bool:
+    """Read access. Returns True for the admin, False for an anonymous viewer in public mode.
+
+    A token that is sent but wrong is still rejected, so a stale dashboard session notices.
+    """
+    if settings.public_dashboard and authorization is None:
+        return False
+    require_admin(request, authorization, settings)
+    return True
+
+
 def authenticate_agent(
     request: Request,
     authorization: str | None = Header(default=None),

@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react'
 //   #/            fleet overview
 //   #/servers/3   one server
 //   #/alerts      alert centre
-//   #/local       this host (the original health page)
+//   #/central     the machine running SentinelEye (the original health page; #/local still works)
+//   #/signin      admin sign-in
 
 function parse(hash) {
   const path = hash.replace(/^#/, '') || '/'
   const server = path.match(/^\/servers\/(\d+)$/)
   if (server) return { page: 'server', id: Number(server[1]) }
   if (path === '/alerts') return { page: 'alerts' }
-  if (path === '/local') return { page: 'local' }
+  if (path === '/central' || path === '/local') return { page: 'central' }
+  if (path === '/signin') return { page: 'signin' }
   return { page: 'fleet' }
 }
 

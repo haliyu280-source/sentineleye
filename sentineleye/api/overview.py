@@ -6,11 +6,11 @@ from ..config import Settings, get_settings
 from ..db import get_db
 from ..models import Alert, Server
 from ..schemas import Averages, OverviewOut
-from ..security import require_admin
+from ..security import viewer_access
 from ..timeutil import utcnow
 from .serializers import server_out
 
-router = APIRouter(prefix="/api", tags=["monitoring"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api", tags=["monitoring"], dependencies=[Depends(viewer_access)])
 
 
 @router.get("/overview", response_model=OverviewOut)

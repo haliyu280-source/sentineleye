@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { ActivityList } from '../components/AlertTable'
-import { SignOutButton } from '../components/AdminGate'
+import { AccessButton } from '../components/AdminGate'
 import { CopyField, ErrorNote, Meter, RefreshButton, StatusChip, StatusDot, StatusText, TopbarControls } from '../components/ui'
+import { useAccess } from '../lib/access'
 import { api } from '../lib/api'
 import { formatPercent, STATUS_LABELS, timeAgo } from '../lib/format'
 import { usePolling } from '../lib/usePolling'
@@ -103,7 +104,7 @@ function MiniMeter({ value, limit }) {
 
 function ServerTable({ servers }) {
   if (servers.length === 0) {
-    return <p className="log-empty">No servers yet. Register one above, then install the agent on it.</p>
+    return <p className="log-empty">No servers are registered yet.</p>
   }
   return (
     <div className="table-wrap">
@@ -238,6 +239,7 @@ function RegisterServer({ onRegistered }) {
 }
 
 export default function Fleet() {
+  const { isAdmin } = useAccess()
   const { data, error, loading, updatedAt, refresh } = usePolling(async () => {
     const [overview, servers, activity] = await Promise.all([
       api('/api/overview'),
@@ -265,7 +267,7 @@ export default function Fleet() {
               {updatedAt && <> · updated {updatedAt.toLocaleTimeString()}</>}
             </p>
           </div>
-          <SignOutButton />
+          <AccessButton />
         </div>
 
         <ErrorNote error={error} onRetry={refresh} />
@@ -288,7 +290,7 @@ export default function Fleet() {
                     Marked offline after {data.overview.heartbeat_timeout_seconds}s without a report
                   </p>
                 </div>
-                <RegisterServer onRegistered={refresh} />
+                {isAdmin && <RegisterServer onRegistered={refresh} />}
               </div>
               <ServerTable servers={data.servers} />
             </section>

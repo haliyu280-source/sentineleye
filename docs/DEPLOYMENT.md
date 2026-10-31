@@ -43,6 +43,15 @@ What the Compose file sets up:
 
 Open http://127.0.0.1:8000 and sign in with the admin token.
 
+### Public showcase
+
+To let people browse the dashboard without a key (for example a portfolio demo), set
+`SENTINELEYE_PUBLIC_DASHBOARD=true` in `.env` and restart. Visitors get a read-only view of
+servers, history and alerts; registering servers, tokens, limits and alert actions stay behind
+*Admin sign in*. Agents' raw error messages and all token information are never shown to
+anonymous visitors. Remember that the names, OS versions and usage of the monitored servers
+become public.
+
 ## 3. HTTPS (required for remote agents)
 
 The backend speaks plain HTTP and expects a reverse proxy to terminate TLS. Agents refuse to send

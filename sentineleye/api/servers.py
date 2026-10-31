@@ -18,13 +18,16 @@ from ..schemas import (
     ServerUpdate,
     TokenOut,
 )
-from ..security import issue_token, require_admin
+from ..security import issue_token, require_admin, viewer_access
 from ..services.history import metric_history
 from ..services.status import active_alert_kinds, latest_metric, server_status
 from ..timeutil import utcnow
 from .serializers import server_out
 
-router = APIRouter(prefix="/api/servers", tags=["servers"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/servers", tags=["servers"])
+
+# Reads are open to anonymous viewers when SENTINELEYE_PUBLIC_DASHBOARD is on; changes never are
+admin_only = [Depends(require_admin)]
 
 
 def get_server_or_404(db: Session, server_id: int) -> Server:
@@ -38,7 +41,7 @@ def _name_taken() -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A server with that name already exists")
 
 
-@router.post("", response_model=ServerCreated, status_code=status.HTTP_201_CREATED)
+@router.post("", dependencies=admin_only, response_model=ServerCreated, status_code=status.HTTP_201_CREATED)
 def register_server(
     body: ServerCreate, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)
 ):
@@ -67,21 +70,29 @@ def register_server(
 
 @router.get("", response_model=list[ServerOut])
 def list_servers(
-    include_disabled: bool = True, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)
+    include_disabled: bool = True,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    is_admin: bool = Depends(viewer_access),
 ):
     query = select(Server).order_by(Server.name)
     if not include_disabled:
         query = query.where(Server.enabled.is_(True))
     now = utcnow()
-    return [server_out(db, s, settings, now) for s in db.scalars(query).all()]
+    return [server_out(db, s, settings, now, private=is_admin) for s in db.scalars(query).all()]
 
 
 @router.get("/{server_id}", response_model=ServerOut)
-def get_server(server_id: int, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
-    return server_out(db, get_server_or_404(db, server_id), settings, utcnow())
+def get_server(
+    server_id: int,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    is_admin: bool = Depends(viewer_access),
+):
+    return server_out(db, get_server_or_404(db, server_id), settings, utcnow(), private=is_admin)
 
 
-@router.patch("/{server_id}", response_model=ServerOut)
+@router.patch("/{server_id}", dependencies=admin_only, response_model=ServerOut)
 def update_server(
     server_id: int, body: ServerUpdate, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)
 ):
@@ -103,7 +114,7 @@ def update_server(
     return server_out(db, server, settings, utcnow())
 
 
-@router.delete("/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{server_id}", dependencies=admin_only, status_code=status.HTTP_204_NO_CONTENT)
 def delete_server(server_id: int, db: Session = Depends(get_db)):
     """Permanently remove a server with its tokens, metric history and alerts. Use PATCH enabled=false to keep history."""
     db.delete(get_server_or_404(db, server_id))
@@ -114,13 +125,13 @@ def delete_server(server_id: int, db: Session = Depends(get_db)):
 # ---------- Tokens ----------
 
 
-@router.get("/{server_id}/tokens", response_model=list[TokenOut])
+@router.get("/{server_id}/tokens", dependencies=admin_only, response_model=list[TokenOut])
 def list_tokens(server_id: int, db: Session = Depends(get_db)):
     server = get_server_or_404(db, server_id)
     return sorted(server.tokens, key=lambda t: t.created_at, reverse=True)
 
 
-@router.post("/{server_id}/tokens", response_model=IssuedTokenOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{server_id}/tokens", dependencies=admin_only, response_model=IssuedTokenOut, status_code=status.HTTP_201_CREATED)
 def issue_additional_token(server_id: int, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
     """Issue an extra token without revoking existing ones (e.g. for a staged agent migration)."""
     server = get_server_or_404(db, server_id)
@@ -129,7 +140,7 @@ def issue_additional_token(server_id: int, db: Session = Depends(get_db), settin
     return IssuedTokenOut(server_id=server.id, token_id=issued.token_id, token=issued.token)
 
 
-@router.post("/{server_id}/tokens/reissue", response_model=IssuedTokenOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{server_id}/tokens/reissue", dependencies=admin_only, response_model=IssuedTokenOut, status_code=status.HTTP_201_CREATED)
 def reissue_token(server_id: int, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
     """Revoke every active token for the server and issue a single replacement."""
     server = get_server_or_404(db, server_id)
@@ -142,7 +153,7 @@ def reissue_token(server_id: int, db: Session = Depends(get_db), settings: Setti
     return IssuedTokenOut(server_id=server.id, token_id=issued.token_id, token=issued.token)
 
 
-@router.post("/{server_id}/tokens/{token_id}/revoke", response_model=TokenOut)
+@router.post("/{server_id}/tokens/{token_id}/revoke", dependencies=admin_only, response_model=TokenOut)
 def revoke_token(server_id: int, token_id: str, db: Session = Depends(get_db)):
     get_server_or_404(db, server_id)
     token = db.scalar(
@@ -159,7 +170,7 @@ def revoke_token(server_id: int, token_id: str, db: Session = Depends(get_db)):
 # ---------- Monitoring ----------
 
 
-@router.get("/{server_id}/status", response_model=ServerStatusOut)
+@router.get("/{server_id}/status", dependencies=[Depends(viewer_access)], response_model=ServerStatusOut)
 def get_server_status(server_id: int, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
     server = get_server_or_404(db, server_id)
     now = utcnow()
@@ -174,7 +185,7 @@ def get_server_status(server_id: int, db: Session = Depends(get_db), settings: S
     )
 
 
-@router.get("/{server_id}/metrics/latest", response_model=MetricOut)
+@router.get("/{server_id}/metrics/latest", dependencies=[Depends(viewer_access)], response_model=MetricOut)
 def get_latest_metrics(server_id: int, db: Session = Depends(get_db)):
     get_server_or_404(db, server_id)
     latest = latest_metric(db, server_id)
@@ -183,7 +194,7 @@ def get_latest_metrics(server_id: int, db: Session = Depends(get_db)):
     return latest
 
 
-@router.get("/{server_id}/metrics", response_model=HistoryOut)
+@router.get("/{server_id}/metrics", dependencies=[Depends(viewer_access)], response_model=HistoryOut)
 def get_metric_history(
     server_id: int,
     range: HistoryRange = Query("1h", description="Time window: 1h, 6h, 24h or 7d"),

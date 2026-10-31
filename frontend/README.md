@@ -21,10 +21,11 @@ src/
     Fleet.jsx          overview, server list, registration
     ServerDetail.jsx   one server: usage, history, agent, alerts, settings, tokens
     Alerts.jsx         incidents and alert history
-    LocalHost.jsx      the original single-machine view (GET /api/health)
+    CentralServer.jsx  Central server page: the machine running SentinelEye (GET /api/health)
   components/          shared UI: meters, status chips, charts, alert table, sign-in
   lib/                 API client, hash router, polling, formatting
 ```
 
-Routes are hash-based (`#/`, `#/servers/3`, `#/alerts`, `#/local`) so the build stays a set of
-static files.
+Routes are hash-based (`#/`, `#/servers/3`, `#/alerts`, `#/central`, `#/signin`) so the build stays
+a set of static files. When the backend runs in public mode the fleet pages open without signing
+in and management controls appear only for the admin.

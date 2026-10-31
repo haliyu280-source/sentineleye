@@ -315,7 +315,7 @@ function SkeletonTiles() {
   ))
 }
 
-export default function LocalHost() {
+export default function CentralServer() {
   const { data, error, checkedAt, loading, secondsLeft, refresh, history } = useHealth()
   const [metric, setMetric] = useState('cpu')
   const status = error ? 'offline' : data?.status === 'healthy' ? 'healthy' : data ? 'warning' : null

@@ -14,10 +14,10 @@ There are two kinds of evidence here, kept separate on purpose:
 .venv/bin/python -m pytest
 ```
 
-Last run: **85 passed** (Python 3.14, macOS). Frontend: `npm --prefix frontend run lint` and
+Last run: **92 passed** (Python 3.14, macOS). Frontend: `npm --prefix frontend run lint` and
 `npm --prefix frontend run build`, both clean.
 
-### Backend (`tests/`, 41 tests)
+### Backend (`tests/`, 48 tests)
 
 | File | Covers |
 |---|---|
@@ -26,6 +26,7 @@ Last run: **85 passed** (Python 3.14, macOS). Frontend: `npm --prefix frontend r
 | `test_agent_ingest.py` | metric storage and server updates; agent cannot report for another server; invalid payloads (ranges, used > total, unknown fields, naive timestamps); stale, future and replayed samples; 64 KB body limit; per-agent rate limit; delivery-failure reporting |
 | `test_alerts.py` | grace period (one breach shows *warning*, no alert); alert after consecutive breaches; duplicate prevention while breaching; recovery and its event; memory and disk alerts; per-server limits; acknowledge then resolve with notes; invalid transitions (409); filters; offline detection and recovery; never-reported servers stay *unknown*; activity feed |
 | `test_history.py` | 1h/6h/24h/7d windows; downsampling of long ranges; latest sample; overview counts and averages |
+| `test_public_mode.py` | private by default; public mode allows every read without a token; every change, and all token endpoints, still refused; agent error text hidden from anonymous viewers; wrong tokens still rejected; admin can still manage |
 | `test_maintenance.py` | retention deletes only expired rows; background cycle opens offline alerts; e-mail sent only after commit and only when configured; SMTP failure does not affect ingestion |
 
 ### Agent (`agent/tests/`, 42 tests)

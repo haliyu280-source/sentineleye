@@ -8,7 +8,8 @@ from ..schemas import AlertOut, EffectiveThresholds, MetricOut, ServerOut, Thres
 from ..services.status import active_alert_kinds, effective_thresholds, latest_metric, server_status
 
 
-def server_out(db: Session, server: Server, settings: Settings, now: datetime) -> ServerOut:
+def server_out(db: Session, server: Server, settings: Settings, now: datetime, private: bool = True) -> ServerOut:
+    """`private=False` is the public view: the agent's raw error text can name internal hosts, so it is left out."""
     latest = latest_metric(db, server.id)
     kinds = active_alert_kinds(db, server.id)
     limits = effective_thresholds(server, settings)
@@ -26,7 +27,7 @@ def server_out(db: Session, server: Server, settings: Settings, now: datetime) -
         agent_version=server.agent_version,
         uptime_seconds=server.uptime_seconds,
         failed_deliveries=server.failed_deliveries,
-        last_agent_error=server.last_agent_error,
+        last_agent_error=server.last_agent_error if private else None,
         thresholds=EffectiveThresholds(
             cpu=limits["cpu_high"], memory=limits["memory_high"], disk=limits["disk_high"]
         ),
