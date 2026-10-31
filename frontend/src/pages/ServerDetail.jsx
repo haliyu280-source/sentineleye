@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AlertTable } from '../components/AlertTable'
 import { LineChart } from '../components/LineChart'
 import { CopyField, ErrorNote, Meter, RefreshButton, Segmented, StatusChip, StatusDot, TopbarControls } from '../components/ui'
-import { AccessButton } from '../components/AdminGate'
+import { AccessButton, BackendOffline } from '../components/AdminGate'
 import { useAccess } from '../lib/access'
 import { api } from '../lib/api'
 import { formatBytes, formatDateTime, formatDuration, formatPercent, STATUS_LABELS, timeAgo } from '../lib/format'
@@ -335,6 +335,8 @@ export default function ServerDetail({ id }) {
 
   const server = data?.server
   const latest = server?.latest
+
+  if (error?.status === 0) return <BackendOffline title={server?.name ?? 'Server'} onRetry={refresh} loading={loading} />
 
   return (
     <>

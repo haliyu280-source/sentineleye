@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAccess } from '../lib/access'
 import { api, ApiError, setToken } from '../lib/api'
-import { OfflineHint } from './ui'
+import { OfflineHint, RefreshButton, StatusChip, TopbarControls } from './ui'
 
 export function SignInForm({ onDone }) {
   const { publicMode } = useAccess()
@@ -87,18 +87,28 @@ export function AdminGate({ children }) {
   return <SignInForm />
 }
 
-function BackendOffline() {
+// Replaces a page's content while the backend is unreachable: no last-known numbers and no
+// "Healthy" status that could be mistaken for live data. Pages keep polling and return by themselves.
+export function BackendOffline({ title = 'Infrastructure', onRetry, loading }) {
   return (
-    <main className="page">
-      <div className="page-head">
-        <h1>Infrastructure</h1>
-        <p className="page-sub">No live data is shown while the backend is unreachable.</p>
-      </div>
-      <div className="alert" role="alert">
-        <strong>Can't reach the SentinelEye backend.</strong> <OfflineHint /> This page checks again every
-        15 seconds.
-      </div>
-    </main>
+    <>
+      {onRetry && (
+        <TopbarControls>
+          <StatusChip status="offline" />
+          <RefreshButton onClick={onRetry} loading={loading} label="Retry" />
+        </TopbarControls>
+      )}
+      <main className="page">
+        <div className="page-head">
+          <h1>{title}</h1>
+          <p className="page-sub">No live data is shown while the backend is unreachable.</p>
+        </div>
+        <div className="alert" role="alert">
+          <strong>Can't reach the SentinelEye backend.</strong> <OfflineHint /> This page checks again every
+          15 seconds.
+        </div>
+      </main>
+    </>
   )
 }
 

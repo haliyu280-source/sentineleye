@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ActivityList } from '../components/AlertTable'
-import { AccessButton } from '../components/AdminGate'
+import { AccessButton, BackendOffline } from '../components/AdminGate'
 import { CopyField, ErrorNote, Meter, RefreshButton, StatusChip, StatusDot, StatusText, TopbarControls } from '../components/ui'
 import { useAccess } from '../lib/access'
 import { api } from '../lib/api'
@@ -250,6 +250,8 @@ export default function Fleet() {
   }, POLL_SECONDS)
 
   const status = data ? fleetStatus(data.overview.servers) : null
+
+  if (error?.status === 0) return <BackendOffline onRetry={refresh} loading={loading} />
 
   return (
     <>

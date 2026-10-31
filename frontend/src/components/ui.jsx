@@ -113,7 +113,8 @@ export function ErrorNote({ error, onRetry }) {
   const unreachable = error.status === 0
   return (
     <div className="alert" role="alert">
-      <strong>{unreachable ? "Can't reach the SentinelEye backend." : 'Request failed.'}</strong> {error.message}.
+      <strong>{unreachable ? "Can't reach the SentinelEye backend." : 'Request failed.'}</strong>
+      {!unreachable && <> {error.message}.</>}
       {unreachable && <> <OfflineHint /></>}
       {onRetry && (
         <>

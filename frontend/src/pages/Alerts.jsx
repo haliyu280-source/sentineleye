@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ActivityList, AlertTable } from '../components/AlertTable'
 import { ErrorNote, RefreshButton, Segmented, StatusChip, TopbarControls } from '../components/ui'
-import { AccessButton } from '../components/AdminGate'
+import { AccessButton, BackendOffline } from '../components/AdminGate'
 import { api } from '../lib/api'
 import { usePolling } from '../lib/usePolling'
 
@@ -26,6 +26,8 @@ export default function Alerts() {
   }, 15)
 
   const active = data ? data.overview.alerts.open + data.overview.alerts.acknowledged : null
+
+  if (error?.status === 0) return <BackendOffline title="Alerts" onRetry={refresh} loading={loading} />
 
   return (
     <>
