@@ -193,7 +193,8 @@ about what was not. Use them to understand the reasoning, not to recite.
 > FastAPI process and SQLite can handle. The main thing I'd watch is the database: that's about
 > 290,000 rows a day, so the 30-day retention and the index on server and time matter. I'd
 > probably move to PostgreSQL at this point for better concurrent writes. The models are written
-> through SQLAlchemy so that's mostly a configuration change, but I haven't tested it yet.
+> through SQLAlchemy, and the whole test suite passes on PostgreSQL 18 as well as SQLite, so it's a
+> configuration change.
 
 **Q: And 1,000 servers?**
 
@@ -216,7 +217,7 @@ about what was not. Use them to understand the reasoning, not to recite.
 > - Agents are Linux only and tested on Ubuntu 24.04 only.
 > - HTTPS depends on a reverse proxy; the app doesn't do TLS itself.
 > - There's one shared admin token instead of user accounts.
-> - Only SQLite has been tested, and there are no schema migrations.
+> - There are no schema migrations yet.
 > - One filesystem per agent.
 > - From the backend's side, a dead server and a broken network look the same.
 > - Agents in containers see the host's CPU and memory, which I noticed in testing: two test
@@ -225,7 +226,7 @@ about what was not. Use them to understand the reasoning, not to recite.
 
 **Q: What would you improve next?**
 
-> Database migrations with Alembic and a tested PostgreSQL setup; user accounts with roles instead
+> Database migrations with Alembic; user accounts with roles instead
 > of the single admin token; signed agent requests for stronger replay protection; an on-disk
 > buffer in the agent so outages don't leave gaps; monitoring more than one filesystem and network
 > traffic; and webhook notifications for Slack or Teams alongside e-mail.

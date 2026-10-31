@@ -1,0 +1,42 @@
+# Render Blueprint for the central SentinelEye backend and dashboard.
+# Free plans only. Secrets are generated or injected by Render and never stored in the repository.
+#
+# Free-tier limits (https://render.com/docs/free): the web service sleeps after 15 minutes without
+# traffic (agents reporting every 30 s keep it awake), and the free Postgres database expires
+# 30 days after creation unless upgraded.
+
+databases:
+  - name: sentineleye-db
+    plan: free
+    region: frankfurt
+    databaseName: sentineleye
+    user: sentineleye
+    # No external connections: only services in this workspace can reach it
+    ipAllowList: []
+
+services:
+  - type: web
+    name: sentineleye
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # The image listens on 8000; tell Render to route there
+      - key: PORT
+        value: "8000"
+      # Behind Render's proxy: trust X-Forwarded-For so rate limits see real client addresses
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: SENTINELEYE_DATABASE_URL
+        fromDatabase:
+          name: sentineleye-db
+          property: connectionString
+      - key: SENTINELEYE_ADMIN_TOKEN
+        generateValue: true
+      # Employers can browse read-only; every change still needs the admin token
+      - key: SENTINELEYE_PUBLIC_DASHBOARD
+        value: "true"

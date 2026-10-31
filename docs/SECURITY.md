@@ -173,5 +173,5 @@ default.
 
 ## Reporting a vulnerability
 
-This is a personal portfolio project. Please contact the author privately rather than opening a
-public issue.
+This is a personal portfolio project. Please contact the author privately through their GitHub
+profile rather than opening a public issue.

@@ -19,6 +19,12 @@ Two kinds of evidence are kept separate on purpose:
 directory, a fixed admin token, background jobs switched off and public mode off, so a
 developer's local `.env` cannot change the results.
 
+To run the suite against PostgreSQL instead of SQLite, point it at an empty database:
+
+```bash
+SENTINELEYE_TEST_DATABASE_URL=postgresql://user:password@127.0.0.1:5432/sentineleye_test .venv/bin/python -m pytest
+```
+
 Dashboard checks:
 
 ```bash
@@ -40,6 +46,7 @@ Run on macOS with Python 3.14:
 |---|---|
 | `python -m pytest` | **92 passed** |
 | Same suite in a freshly created virtual environment from `requirements-dev.txt` | 92 passed |
+| Same suite against PostgreSQL 18.6 (`postgres:18` container) | 92 passed |
 | `npm run lint` | no findings |
 | `npm run build` | succeeded |
 | `bash -n` on the three scripts | no errors |
@@ -246,7 +253,6 @@ docker exec node1 systemctl start sentineleye-agent
 
 ## Not tested
 
-- PostgreSQL.
 - Linux distributions other than Ubuntu 24.04.
 - Delivery through a real SMTP server.
 - The Caddy example in [DEPLOYMENT.md](DEPLOYMENT.md), or any real TLS deployment.

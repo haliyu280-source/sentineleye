@@ -42,7 +42,7 @@ the Docker build.
 |---|---|---|
 | `SENTINELEYE_ADMIN_TOKEN` | unset | Admin token. Unset means the management API is disabled (503). |
 | `SENTINELEYE_PUBLIC_DASHBOARD` | `false` | Allow read-only access without a token |
-| `SENTINELEYE_DATABASE_URL` | `sqlite:///./data/sentineleye.db` | Database location |
+| `SENTINELEYE_DATABASE_URL` | `sqlite:///./data/sentineleye.db` | Database location. PostgreSQL: `postgresql://user:password@host:5432/dbname` |
 | `SENTINELEYE_HEARTBEAT_TIMEOUT_SECONDS` | `90` | Silence before a server is offline |
 | `SENTINELEYE_BACKGROUND_INTERVAL_SECONDS` | `15` | How often offline checks run |
 | `SENTINELEYE_RUN_BACKGROUND_JOBS` | `true` | Turn the background job off (tests use this) |
@@ -179,6 +179,27 @@ must point at the host, and ports 80 and 443 must be open. Keep the `sentineleye
 `127.0.0.1`, and set `FORWARDED_ALLOW_IPS` in its environment to the proxy's address so that
 client addresses (used for rate limiting) are taken from `X-Forwarded-For`. With nginx, use
 `proxy_pass http://127.0.0.1:8000;` and set `X-Forwarded-For` and `X-Forwarded-Proto`.
+
+## Render
+
+`render.yaml` is a Render Blueprint for one free Docker web service and one free Render Postgres
+database in Frankfurt. Render generates `SENTINELEYE_ADMIN_TOKEN` and injects
+`SENTINELEYE_DATABASE_URL` from the database, so neither is stored in the repository. The
+database accepts connections only from the workspace's services. Check the file before applying
+it:
+
+```bash
+render blueprints validate ./render.yaml
+```
+
+Render's free tier has limits that affect SentinelEye ([render.com/docs/free](https://render.com/docs/free)):
+
+- The web service sleeps after 15 minutes without inbound requests. Agents reporting every 30
+  seconds keep it awake; with no agents it sleeps and takes about a minute to wake.
+- Its filesystem is temporary, so the database must be Postgres, not the default SQLite file.
+- Free Postgres expires 30 days after creation, holds 1 GB and has no backups.
+- Render asks for a payment method on the account before applying a Blueprint, even when every
+  resource in it is free.
 
 ## Production configuration checklist
 

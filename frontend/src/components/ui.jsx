@@ -97,7 +97,7 @@ export function ErrorNote({ error, onRetry }) {
       <strong>{unreachable ? "Can't reach the SentinelEye backend." : 'Request failed.'}</strong> {error.message}.
       {unreachable && (
         <>
-          {' '}Start it from the project folder with <code>python -m fastapi dev main.py</code>.
+          {' '}Start it from the project folder with <code>.venv/bin/python -m uvicorn main:app --reload</code>.
         </>
       )}
       {onRetry && (

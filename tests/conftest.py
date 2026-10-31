@@ -9,7 +9,8 @@ import pytest
 _db_dir = tempfile.mkdtemp(prefix="sentineleye-tests-")
 os.environ.update(
     {
-        "SENTINELEYE_DATABASE_URL": f"sqlite:///{_db_dir}/test.db",
+        # SQLite by default; set SENTINELEYE_TEST_DATABASE_URL to run the suite against PostgreSQL
+        "SENTINELEYE_DATABASE_URL": os.environ.get("SENTINELEYE_TEST_DATABASE_URL", f"sqlite:///{_db_dir}/test.db"),
         "SENTINELEYE_ADMIN_TOKEN": "test-admin-token",
         "SENTINELEYE_RUN_BACKGROUND_JOBS": "false",
         # Explicit values win over a developer's local .env

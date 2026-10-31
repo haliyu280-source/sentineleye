@@ -282,7 +282,7 @@ function ErrorAlert({ error, hasData }) {
     return (
       <div className="alert" role="alert">
         <strong>Can't reach the SentinelEye backend.</strong> {error.message}. Start it from the
-        project folder with <code>python -m fastapi dev main.py</code>. {fallback}
+        project folder with <code>.venv/bin/python -m uvicorn main:app --reload</code>. {fallback}
       </div>
     )
   }

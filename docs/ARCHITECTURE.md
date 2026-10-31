@@ -146,8 +146,8 @@ sequenceDiagram
 
 ## Database
 
-SQLite through SQLAlchemy 2.0, file `data/sentineleye.db` locally and `/data/sentineleye.db` in
-Docker. Foreign keys and WAL mode are switched on at connection time. Tables are created at
+SQLite through SQLAlchemy 2.0 by default (file `data/sentineleye.db` locally, `/data/sentineleye.db`
+in Docker), or PostgreSQL through `SENTINELEYE_DATABASE_URL`; the test suite passes on both. Foreign keys and WAL mode are switched on at connection time. Tables are created at
 start-up with `create_all`; there are no migrations.
 
 ```mermaid
@@ -346,6 +346,7 @@ the unique index guarantees one incident per condition even under concurrent req
 keeps the backend stateless.
 
 **SQLite and an in-process job.** One file and one process are enough for tens of agents and
-make the project easy to run anywhere. The cost is that the rate limiter and background job
+make the project easy to run anywhere. PostgreSQL is supported for hosts without persistent disk,
+such as Render's free tier. The cost is that the rate limiter and background job
 assume a single backend process; see the scaling notes in the
 [interview guide](INTERVIEW_GUIDE.md).

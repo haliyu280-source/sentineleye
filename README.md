@@ -154,9 +154,9 @@ Details and limits: [docs/SECURITY.md](docs/SECURITY.md).
 | Monitoring script | Bash, standard Unix tools (`df`, `top`, `free`, `ps`, `sysctl`) |
 | Agent | Python 3.10+, standard library, systemd |
 | Backend | Python, FastAPI, Pydantic, SQLAlchemy 2.0, Uvicorn |
-| Database | SQLite (WAL mode) |
+| Database | SQLite (WAL mode) by default; PostgreSQL 18 tested |
 | Dashboard | React 19, Vite |
-| Deployment | Docker (multi-stage build), Docker Compose |
+| Deployment | Docker (multi-stage build), Docker Compose, Render Blueprint (`render.yaml`) |
 | Tests | pytest, FastAPI TestClient |
 
 ## Screenshots
@@ -256,8 +256,8 @@ See [docs/SECURITY.md](docs/SECURITY.md).
 ## Limitations
 
 - Remote agents support Linux only and have been tested on Ubuntu 24.04 only.
-- SQLite is the only database that has been tested. The SQLAlchemy layer is written to allow
-  PostgreSQL, but that has not been tried.
+- SQLite and PostgreSQL 18 pass the full test suite; PostgreSQL has not yet run under long-term
+  production load.
 - No schema migrations; tables are created on start-up.
 - One filesystem per agent (`/` by default).
 - From the backend's point of view, a powered-off server, a network outage and a stopped agent
@@ -278,10 +278,8 @@ frontend/                  React dashboard
 tests/                     Backend and end-to-end tests
 docs/                      Documentation and screenshots
 Dockerfile, compose.yaml   Central deployment
+render.yaml                Render Blueprint (free web service and free Postgres)
 ```
-
-The files `health-check`, `health-check.shx` and `health-checker.sh` are leftovers from the
-original script's early history and are not used.
 
 ## Author
 
