@@ -2,288 +2,181 @@
 
 **A sharper eye on your infrastructure.**
 
-SentinelEye is a self-hosted monitoring platform for Linux servers. A small Python agent on each
-server reports CPU, memory, disk and uptime to a central FastAPI backend, which stores the history,
-works out each server's health, raises alerts when limits are crossed or a server goes quiet, and
-shows it all on a web dashboard.
+SentinelEye is a self-hosted monitoring platform for Linux servers. A small agent on each server
+reports CPU, memory, disk and uptime to a central FastAPI backend. The backend stores the history,
+decides whether each server is healthy, opens and closes incidents when limits are crossed or a
+server stops reporting, and shows everything on a web dashboard.
 
-It started as a single Bash health-check script and grew into a multi-server system. The original
-script is still here, still works on its own, and still powers the dashboard's *Central server* page.
+> Independent portfolio project by **Ali Khaleel Hassan**. All rights reserved; see [LICENSE](LICENSE).
 
-> Independent portfolio project by **Ali Khaleel Hassan**. See [LICENSE](LICENSE).
-
----
-
-## Contents
-
-- [What it does](#what-it-does)
-- [How it works](#how-it-works)
-- [Quick start (local development)](#quick-start-local-development)
-- [Deploy with Docker](#deploy-with-docker)
-- [Monitor a Linux server](#monitor-a-linux-server)
-- [API](#api)
-- [Security model](#security-model)
-- [Testing](#testing)
-- [Screenshots](#screenshots)
-- [Limitations](#limitations)
-- [Roadmap](#roadmap)
-- [Project layout](#project-layout)
+| | |
+|---|---|
+| **What it monitors** | Linux servers (tested on Ubuntu 24.04): CPU, memory, disk, uptime, availability |
+| **How** | Python agent → HTTPS → FastAPI backend → SQLite → React dashboard |
+| **Alerting** | Threshold and availability incidents with grace period, deduplication and automatic recovery |
+| **Tested** | 92 automated tests, plus live runs on Ubuntu 24.04 with real load and real agent outages |
 
 ---
 
-## What it does
+## Documentation
 
-**Monitoring**
-- A Python agent (standard library only, no pip install on the monitored server) reads `/proc` and
-  `statvfs` every 30 seconds: CPU %, memory total/used/available, disk total/used/available,
-  uptime, hostname, OS release and kernel.
-- Installs as a hardened systemd service under its own unprivileged account.
-- Retries network failures with capped exponential backoff and reports how many deliveries
-  failed once it reconnects.
+| Document | Contents |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | Components, data flow, database, health evaluation, alert lifecycle, design decisions |
+| [Security](docs/SECURITY.md) | Authentication, tokens, replay protection, limits, access levels, what is and is not implemented |
+| [Deployment](docs/DEPLOYMENT.md) | Local development, Docker, configuration, agent installation, HTTPS, troubleshooting |
+| [Testing](docs/TESTING.md) | Test suite layout, how to run it, live verification on Ubuntu, Docker validation |
+| [Operations](docs/OPERATIONS.md) | Runbook: registering servers, investigating alerts, handling outages, rotating tokens |
+| [Interview guide](docs/INTERVIEW_GUIDE.md) | How the system works, explained through likely interview questions |
 
-**Central backend**
-- Server registry with per-server CPU, memory and disk limits (defaults 80 / 85 / 80 %).
-- One authentication token per agent; only a SHA-256 hash is stored. Tokens can be revoked,
-  reissued and set to expire.
-- Metric history in SQLite (SQLAlchemy, so PostgreSQL can be swapped in) with 1h / 6h / 24h / 7d
-  queries, downsampled for long ranges, and a retention job that removes old rows.
-- Server status derived on every read: `healthy`, `warning`, `offline`, `unknown` (never reported)
-  or `disabled`.
+Reference material also in the repository: [agent guide](docs/AGENT.md) and [API reference](docs/API.md).
 
-**Alerting**
-- High CPU, high memory, high disk, and *server unavailable* (no report within the heartbeat
-  timeout, 90 s by default).
-- A threshold alert opens only after **N consecutive** breaching samples (default 2), so one spike
-  does not page anyone.
-- One active incident per server and condition. While the condition lasts, the incident is
-  updated (last value, peak, last observed) instead of duplicated; the database enforces this with a
-  partial unique index.
-- Incidents move `open → acknowledged → resolved`. When the metric recovers, the incident closes
-  itself as *recovered*. Every step is kept as an event.
-- Optional e-mail on open and recovery through SMTP. Monitoring works the same without it.
+## How the project evolved
 
-**Dashboard**
-- *Fleet*: overall status, server counts, fleet averages, the server list and recent alert
-  activity. New servers can be registered here; the token is shown once.
-- *Server*: live usage against its limits, stored history with range and metric selectors, agent
-  connection details, alerts, limit settings and token management.
-- *Alerts*: active and resolved incidents with acknowledge/resolve and a per-incident timeline.
-- *Central server*: the machine running SentinelEye, checked by the original `sentinel.sh`.
-- Optional **public read-only mode** (`SENTINELEYE_PUBLIC_DASHBOARD=true`): anyone can browse
-  servers, history and alerts without a key; every change still needs the admin token.
+1. **A Bash health check.** It started as `health-check.sh`, a script that inspects one machine:
+   OS, CPU, memory, disk, uptime and top processes, with configurable CPU and disk thresholds,
+   readable text output and JSON output. It runs on macOS and Linux and was tested on macOS and on
+   Ubuntu 24.04 in Docker. It is now `sentinel.sh`.
+2. **An API around it.** A FastAPI backend runs the script and serves its JSON at
+   `GET /api/health`. The script deliberately exits with code 1 when a check is in warning while
+   still printing valid JSON, so the backend treats exit codes 0 and 1 as results and anything
+   else as a failure.
+3. **A dashboard.** A React dashboard was added on top of the API, first in a dark theme and then
+   redesigned in its current light, minimal style inspired by Anduril and Palantir.
+4. **A multi-server platform.** Monitoring one machine through a script does not scale to a
+   fleet, so the project grew a Linux agent, a database with history, an alert engine, server
+   and token management, and Docker deployment. The original script and endpoint still work and
+   are shown on the dashboard's *Central server* page.
 
-Everything on the dashboard comes from the API. There is no sample or placeholder data.
+## The problem
+
+Anyone running more than a couple of Linux servers needs to know, without logging in to each
+one, whether they are up, whether a disk is filling or a CPU is pinned, and when that started.
+They also need to be told once when something goes wrong, not every 30 seconds, and to see when
+it recovered. SentinelEye covers that core loop: collect, store, evaluate, alert, display.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    subgraph Linux servers
+    subgraph Monitored["Monitored Linux servers"]
         A1["sentineleye-agent<br/>(systemd, unprivileged)"]
         A2["sentineleye-agent"]
     end
-    subgraph Central host
+    subgraph Central["Central host"]
         P["TLS reverse proxy<br/>(production)"]
-        B["FastAPI backend<br/>main.py + sentineleye/"]
+        B["FastAPI backend"]
         J["Background job<br/>offline checks, retention"]
-        D[("SQLite / PostgreSQL")]
-        S["sentinel.sh<br/>(central server check)"]
-        UI["Dashboard<br/>(React, served by FastAPI)"]
+        D[("SQLite")]
+        S["sentinel.sh"]
+        UI["React dashboard<br/>(served by FastAPI)"]
     end
-    A1 -- "HTTPS POST /api/agent/metrics<br/>Bearer agent token" --> P
+    A1 -- "POST /api/agent/metrics<br/>Bearer agent token" --> P
     A2 --> P
     P --> B
     B <--> D
     J <--> D
     B -- "GET /api/health" --> S
-    UI -- "admin token" --> B
-    B -. "SMTP (optional)" .-> M[(Mail)]
+    UI -- "GET /api/..." --> B
 ```
 
-1. An operator registers a server and receives an agent token (once).
-2. The agent sends a sample every 30 s. The backend checks the token, that the token belongs to
-   the `server_id` in the payload, the payload's ranges, and that the timestamp is recent and
-   newer than the last one.
-3. The sample is stored and evaluated against the server's limits, opening, updating or
-   recovering incidents.
-4. Every 15 s a background job looks for servers that have gone quiet and opens *server
-   unavailable* incidents, and once an hour removes metrics past the retention period.
+1. An operator registers a server and receives a one-time agent token.
+2. The agent on that server reads `/proc` and the root filesystem every 30 seconds and sends a
+   JSON sample over HTTPS.
+3. The backend authenticates the token, checks that it belongs to the server named in the
+   sample, rejects stale or replayed samples, validates the values and stores them.
+4. Each sample is compared with the server's limits. Two consecutive breaches open an incident;
+   a sample back under the limit closes it as recovered.
+5. Every 15 seconds a background job marks servers that have been silent for 90 seconds as
+   offline and opens a *server unavailable* incident. Once an hour it deletes metrics older than
+   the retention period.
+6. The dashboard polls the API and shows the fleet, each server's history and the incidents.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) covers the data model, alert state machine and design decisions.
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Quick start (local development)
+## Features
 
-Requirements: Python 3.11+, Node.js 20+.
+**Standalone check (`sentinel.sh`)**
+- OS, uptime, disk usage, CPU usage, memory and the top processes by CPU.
+- `DISK_THRESHOLD` and `CPU_THRESHOLD` (default 80), validated as whole numbers up to 100.
+- Text output, or JSON with `OUTPUT_FORMAT=json`. Exit code 0 when healthy, 1 on a warning.
+- macOS and Linux. On Linux the JSON field `memory_total_mb` is `null` (the text output shows
+  `free -h` instead), and the top-process list appears only in text output.
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
+**Linux agent (`agent/`)**
+- Python standard library only: `/proc/stat`, `/proc/meminfo`, `/proc/uptime`, `/etc/os-release`
+  and `statvfs`. Nothing to `pip install` on monitored servers.
+- Reports hostname, OS, kernel, uptime, CPU %, memory and disk (total, used, available, percent).
+- Retries network errors, HTTP 5xx and 429 with capped exponential backoff, and reports how many
+  deliveries failed once it gets through.
+- Installer script and systemd unit; runs as the unprivileged `sentineleye` user with systemd
+  sandboxing.
 
-cp .env.example .env
-# set SENTINELEYE_ADMIN_TOKEN in .env, e.g. to the output of:
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+**Central backend (`sentineleye/`, `main.py`)**
+- Server registration, update, disable and delete.
+- Default limits CPU 80 %, memory 85 %, disk 80 %, overridable per server.
+- Metric history with 1h, 6h, 24h and 7d views; long ranges are averaged into at most 360 points.
+- Hourly deletion of metrics older than 30 days (configurable).
+- Server states: healthy, warning, offline, unknown (never reported) and disabled.
+- Interactive API documentation at `/docs`.
 
-.venv/bin/python -m fastapi dev main.py          # API on http://127.0.0.1:8000
-```
+**Alerting**
+- `cpu_high`, `memory_high`, `disk_high` and `server_offline` incidents.
+- Two consecutive breaching samples before a threshold incident opens (configurable).
+- One active incident per server and kind, enforced in the database; repeated breaches update it.
+- Acknowledge and resolve; automatic resolution as *recovered*; a timeline of every event.
+- Optional e-mail on opening and recovery through SMTP.
 
-In a second terminal:
+**Security**
+- One token per agent; only a SHA-256 hash of its secret is stored.
+- Revocation, reissue and optional expiry (`SENTINELEYE_TOKEN_TTL_DAYS`).
+- A token can only submit data for its own server.
+- Samples more than 5 minutes from the server clock, or not newer than the last one, are rejected.
+- Request bodies over 64 KB and more than 30 reports per minute per agent are refused.
+- Optional public read-only mode; all changes require the admin token.
+- The agent only reports. There is no remote command execution anywhere in the system.
 
-```bash
-npm --prefix frontend install
-npm --prefix frontend run dev                    # dashboard on http://localhost:5173
-```
+Details and limits: [docs/SECURITY.md](docs/SECURITY.md).
 
-Open http://localhost:5173, sign in with the admin token, and register a server. With
-`SENTINELEYE_PUBLIC_DASHBOARD=true` in `.env` the dashboard opens without signing in, read-only;
-use *Admin sign in* to manage.
-API documentation is at http://127.0.0.1:8000/docs.
+**Dashboard (`frontend/`)**
+- *Fleet*: overall status, server counts, fleet averages, server list, recent alert activity.
+- *Server*: live usage against limits, stored history, agent details, incidents; for the admin,
+  limits, tokens, disable and delete.
+- *Alerts*: active and resolved incidents with their timelines; acknowledge and resolve for the
+  admin.
+- *Central server*: the original `sentinel.sh` check of the machine running SentinelEye.
+- Works on desktop and phone widths.
 
-The original script still runs on its own (macOS and Linux):
+## Technology
 
-```bash
-bash sentinel.sh                                 # human-readable report
-OUTPUT_FORMAT=json bash sentinel.sh              # JSON; exit code 1 means a check is in warning
-DISK_THRESHOLD=70 CPU_THRESHOLD=90 bash sentinel.sh
-```
-
-## Deploy with Docker
-
-```bash
-cp .env.example .env          # set SENTINELEYE_ADMIN_TOKEN (and SMTP if wanted)
-docker compose up -d --build
-docker compose ps             # wait for "healthy"
-```
-
-The container serves the API and dashboard on `127.0.0.1:8000`, keeps its database in the
-`sentineleye-data` volume, runs as a non-root user on a read-only filesystem, restarts unless
-stopped, and caps its logs. No secrets are built into the image.
-
-Agents on other machines must reach it over **HTTPS**. Put a reverse proxy such as Caddy or nginx
-in front; [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) has a working Caddy example, backups and
-upgrade steps.
-
-## Monitor a Linux server
-
-Tested on Ubuntu 24.04 with systemd. Needs Python 3.10+ (Ubuntu ships 3.12).
-
-1. Register the server in the dashboard (*Fleet → Register server*) or with the API, and copy the
-   **server id** and **token**.
-2. On the server, from a copy of this repository:
-
-   ```bash
-   cd agent
-   sudo ./install.sh --url https://monitor.example.com --server-id 3
-   # paste the token when asked; it is not echoed and never goes on the command line
-   ```
-
-   The installer creates the `sentineleye` system user, installs the agent to
-   `/opt/sentineleye-agent`, writes `/etc/sentineleye-agent/agent.env` (mode 640), sends one test
-   sample, and enables the `sentineleye-agent` service.
-3. The server turns *Healthy* on the Fleet page within one interval.
-
-```bash
-systemctl status sentineleye-agent
-journalctl -u sentineleye-agent -f
-sudo systemctl restart sentineleye-agent
-```
-
-Configuration, troubleshooting, token rotation and removal: [docs/AGENT.md](docs/AGENT.md).
-
-## API
-
-Interactive documentation is generated by FastAPI at `/docs` (Swagger) and `/redoc`.
-
-| Area | Endpoints | Auth |
-|---|---|---|
-| Original check | `GET /api/health` | none |
-| Service probe | `GET /healthz`, `GET /api/meta` | none |
-| Agent ingestion | `POST /api/agent/metrics` | agent token |
-| Servers | `GET /api/servers`, `GET /api/servers/{id}` | viewer |
-| Server changes | `POST /api/servers`, `PATCH/DELETE /api/servers/{id}` | admin |
-| Tokens | `GET/POST /api/servers/{id}/tokens`, `POST …/tokens/reissue`, `POST …/tokens/{token_id}/revoke` | admin |
-| Monitoring | `GET /api/servers/{id}/status`, `…/metrics/latest`, `…/metrics?range=1h\|6h\|24h\|7d`, `GET /api/overview` | viewer |
-| Alerts | `GET /api/alerts`, `GET /api/alerts/{id}`, `GET /api/alert-events` | viewer |
-| Alert actions | `POST /api/alerts/{id}/acknowledge`, `POST …/resolve` | admin |
-
-*viewer* means the admin token, or nobody at all when `SENTINELEYE_PUBLIC_DASHBOARD=true`.
-
-`GET /api/health` keeps its original fields (`operating_system`, `disk_usage`, `cpu_usage`,
-`memory_total_mb`, `status`) and adds per-check fields (`disk_status`, `disk_threshold`,
-`cpu_status`, `cpu_threshold`). Examples with `curl` are in [docs/API.md](docs/API.md).
-
-## Security model
-
-What is implemented:
-
-- **Agent tokens** are 256-bit random secrets with a public lookup id (`se_<id>_<secret>`). The
-  database stores only the SHA-256 of the secret; the full token is returned once, at issue time.
-  Comparisons are constant-time. Revoked, expired and unknown tokens get the same 401.
-- **Server binding**: a token is tied to one server; a payload naming another `server_id` is
-  refused (403).
-- **Freshness**: samples older or newer than 5 minutes from the backend's clock are rejected, and
-  a sample not newer than the last accepted one is refused (409). This blocks simple replays.
-- **Input limits**: strict schemas (unknown fields rejected, percentages 0–100, used ≤ total),
-  and request bodies over 64 KB are refused (413) whether or not `Content-Length` is sent.
-- **Rate limits**: 30 reports per minute per agent token; 10 failed authentication attempts per
-  minute per client address.
-- **Management API** needs `SENTINELEYE_ADMIN_TOKEN`. If it is not set, those endpoints are
-  disabled instead of open.
-- **Public read-only mode** is off by default. When on, anonymous visitors can read server
-  status, metrics, history and alerts, but not tokens, not the agents' raw error messages (they
-  can name internal hosts), and they cannot change anything. Hostnames, OS versions and
-  metrics of monitored servers do become public, so only enable it for servers you are happy
-  to show.
-- **Agent host**: runs as a dedicated non-login user under systemd sandboxing
-  (`ProtectSystem=strict`, no capabilities, memory and CPU caps). It refuses to send its token over
-  plain HTTP to anything other than localhost unless explicitly overridden.
-- **No remote execution**: the agent only reads metrics and sends them. The backend has no way to
-  run commands on monitored servers.
-- Tokens are not logged by the agent or the backend.
-
-What it does **not** do, so these are not claimed:
-
-- It does not terminate TLS itself. HTTPS is required in production and comes from a reverse
-  proxy (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
-- There are no user accounts or roles. One shared admin token controls the management API; the
-  dashboard keeps it in the browser tab's session storage.
-- Rate limits are kept in memory, so they apply per backend process.
-- Replay protection relies on timestamps and ordering, not signed requests or nonces.
-
-## Testing
-
-```bash
-.venv/bin/python -m pytest
-```
-
-92 automated tests: 48 for the backend, 42 for the agent, and 2 end-to-end tests where the real
-agent code (configuration, `/proc` parsing, HTTP client) reports to the real backend and drives
-registration, persistence, a CPU alert, its recovery, offline detection and recovery from it.
-
-Those tests use **controlled values** written as `/proc` files. Separately, the system was run for
-real on Ubuntu 24.04.5 LTS hosts in Docker: the installer, systemd service, live metrics, a real
-CPU-load alert and its recovery, offline detection after stopping the agent, acknowledgement from
-the dashboard, token revocation and reissue, and the Docker deployment.
-[docs/TESTING.md](docs/TESTING.md) lists what was checked and how to repeat it.
+| Area | Used |
+|---|---|
+| Monitoring script | Bash, standard Unix tools (`df`, `top`, `free`, `ps`, `sysctl`) |
+| Agent | Python 3.10+, standard library, systemd |
+| Backend | Python, FastAPI, Pydantic, SQLAlchemy 2.0, Uvicorn |
+| Database | SQLite (WAL mode) |
+| Dashboard | React 19, Vite |
+| Deployment | Docker (multi-stage build), Docker Compose |
+| Tests | pytest, FastAPI TestClient |
 
 ## Screenshots
 
-Captured from a live run with two Ubuntu 24.04 agents, after a real CPU-load test and an agent
-outage.
+Captured from a live run with two Ubuntu 24.04 agents, viewed without signing in (public
+read-only mode). The CPU spike in the history chart is a real load test.
 
 **Fleet overview**
 
 ![Fleet overview](docs/screenshots/fleet.png)
 
-**Server detail: live usage, stored history (the CPU spike is the load test), agent connection,
-alerts and settings**
+**Server detail**
 
 ![Server detail](docs/screenshots/server-detail.png)
 
-**Alert centre with incident history**
+**Alerts and incident history**
 
 ![Alerts](docs/screenshots/alerts.png)
 
-**Central server: the original `sentinel.sh` check**
+**Central server (the original `sentinel.sh` check)**
 
 ![Central server](docs/screenshots/central-server.png)
 
@@ -294,46 +187,101 @@ alerts and settings**
 
 </details>
 
+## Getting started
+
+Requirements: Python 3.11+, Node.js 20+.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # put this in SENTINELEYE_ADMIN_TOKEN
+.venv/bin/python -m uvicorn main:app --reload                    # API on http://127.0.0.1:8000
+```
+
+In a second terminal:
+
+```bash
+npm --prefix frontend install
+npm --prefix frontend run dev                                    # dashboard on http://localhost:5173
+```
+
+`http://localhost:5173` is the local development server. It only exists on the machine running
+it and is not a public demo address.
+
+**Docker** (API and dashboard on `http://127.0.0.1:8000`):
+
+```bash
+cp .env.example .env      # set SENTINELEYE_ADMIN_TOKEN
+docker compose up -d --build
+```
+
+**Agent** on a Linux server, after registering the server in the dashboard:
+
+```bash
+cd agent
+sudo ./install.sh --url https://monitor.example.com --server-id 3
+```
+
+The standalone script still works on its own:
+
+```bash
+bash sentinel.sh
+OUTPUT_FORMAT=json bash sentinel.sh
+```
+
+Full instructions, including HTTPS and troubleshooting: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Tests
+
+```bash
+.venv/bin/python -m pytest
+```
+
+92 tests: 48 for the backend, 2 end-to-end tests that run the real agent code against the real
+backend, and 42 for the agent. The automated tests use controlled values; the live checks on
+Ubuntu 24.04 used real metrics. See [docs/TESTING.md](docs/TESTING.md).
+
+## Security considerations
+
+- Production deployments need HTTPS in front of the backend; the application does not terminate
+  TLS itself.
+- There is a single shared admin token, not user accounts.
+- Public read-only mode makes server names, OS versions and usage visible to anyone. Leave it off
+  unless that is intended.
+- Rate limits are held in memory and apply per backend process.
+
+See [docs/SECURITY.md](docs/SECURITY.md).
+
 ## Limitations
 
-- Remote agents support **Linux only** and were tested on Ubuntu 24.04. Other systemd-based
-  distributions should work but have not been tested.
-- The local `sentinel.sh` check supports macOS and Linux, as before. On Linux it does not fill
-  `memory_total_mb` (it prints `free -h` in text mode instead); this is the script's existing
-  behaviour and was left unchanged.
-- Agents running in containers see the host kernel's CPU and memory figures, because `/proc/stat`
-  and `/proc/meminfo` are not namespaced.
-- *Server unavailable* means "no report within the timeout". From the backend's side a powered-off
-  server, a network outage and a stopped agent look the same; the agent reports failed deliveries
-  when it reconnects, which helps tell them apart afterwards.
+- Remote agents support Linux only and have been tested on Ubuntu 24.04 only.
+- SQLite is the only database that has been tested. The SQLAlchemy layer is written to allow
+  PostgreSQL, but that has not been tried.
+- No schema migrations; tables are created on start-up.
 - One filesystem per agent (`/` by default).
-- Schema changes are applied with `create_all`; there are no migrations yet.
-
-## Roadmap
-
-- Alembic migrations, then PostgreSQL as a documented production option.
-- Per-user accounts with roles instead of a single admin token.
-- Monitoring several mount points and network interfaces per server.
-- Webhook notifications (Slack, Teams, PagerDuty) alongside e-mail.
-- Signed agent payloads for stronger replay protection.
+- From the backend's point of view, a powered-off server, a network outage and a stopped agent
+  all look the same: no reports.
+- Agents running inside containers report the host kernel's CPU and memory figures.
+- E-mail notifications have been tested against a simulated SMTP server only.
+- The trend chart and check log on the *Central server* page are kept in the browser and reset on
+  reload; fleet history is stored in the database.
 
 ## Project layout
 
 ```
-main.py                    FastAPI app: original /api/health plus the platform routers
-sentinel.sh                Original Bash health check (macOS + Linux)
-sentineleye/               Central backend
-  api/                     Routes: servers, agent ingestion, overview, alerts
-  services/                Status, alert engine, history, background jobs
-  models.py  schemas.py    Database tables and API contracts
-  security.py              Tokens, admin auth, rate limiting
-  config.py  db.py         Settings and database setup
-agent/                     Linux agent, installer, systemd unit, tests
-frontend/                  React dashboard (Vite)
+sentinel.sh                Original Bash health check (macOS and Linux)
+main.py                    FastAPI application: GET /api/health plus the platform routers
+sentineleye/               Central backend: api/, services/, models, schemas, security, config
+agent/                     Linux agent, installer, systemd unit, agent tests
+frontend/                  React dashboard
 tests/                     Backend and end-to-end tests
-docs/                      Agent, deployment, API and testing guides
-Dockerfile  compose.yaml   Central deployment
+docs/                      Documentation and screenshots
+Dockerfile, compose.yaml   Central deployment
 ```
+
+The files `health-check`, `health-check.shx` and `health-checker.sh` are leftovers from the
+original script's early history and are not used.
 
 ## Author
 
